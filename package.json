@@ -1,0 +1,16 @@
+{
+  "name": "maniphest",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --force",
+    "test": "npm test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "@types/node": "^24"
+  }
+}
