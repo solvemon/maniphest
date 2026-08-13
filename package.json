@@ -7,10 +7,15 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --force",
-    "test": "npm test --workspaces"
+    "test": "npm run build && npm run lint && npm test --workspaces",
+    "lint": "eslint packages/sim"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
-    "@types/node": "^24"
+    "@types/node": "^24",
+    "eslint": "^10",
+    "@babel/core": "^8",
+    "@babel/eslint-parser": "^8",
+    "@babel/preset-typescript": "^8"
   }
 }
