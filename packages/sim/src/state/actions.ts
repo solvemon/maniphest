@@ -118,5 +118,9 @@ export function defineAction<A>(spec: {
     parse: (raw) => spec.parse(raw),
     duration: (state, action) => spec.duration(state, action as A), // the ONE cast
     apply: (state, action) => spec.apply(state, action as A), // the ONE cast
+    // `exactOptionalPropertyTypes` treats an explicit `requires: undefined`
+    // as different from an absent key, so the key must be omitted entirely
+    // rather than assigned `undefined` when the spec didn't set it.
+    ...(spec.requires === undefined ? {} : { requires: spec.requires }),
   };
 }
