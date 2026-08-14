@@ -54,3 +54,14 @@ const BY_ID: Record<string, System> = Object.create(null);
 for (const system of SYSTEMS) {
     BY_ID[system.id] = system;
 }
+
+/**
+ * Looks up a system by its id.
+ *
+ * Returns `null` for an unknown id rather than throwing, so callers in the
+ * action loop can turn a bad id into a `Rejection` result instead of an
+ * exception unwinding the call stack.
+ */
+export function systemById(id: string): System | null {
+    return BY_ID[id] ?? null;
+}
