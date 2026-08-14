@@ -282,8 +282,13 @@ test('should compute duration from the pre-action state, not the post-apply stat
  * delta of 0. Keyed by `action.type` so M0-04+ can append a sample alongside
  * each new registry entry without touching the assertion itself.
  */
+const UNDOCKED_AT_SOL = reduce(initialState(SEED), { type: 'UNDOCK' });
+
 const SAMPLE_ACTIONS: Record<string, { state: State; action: unknown }> = {
     WAIT: { state: initialState(SEED), action: { type: 'WAIT', n: 4 } },
+    JUMP: { state: UNDOCKED_AT_SOL, action: { type: 'JUMP', systemId: 'vega' } },
+    DOCK: { state: UNDOCKED_AT_SOL, action: { type: 'DOCK' } },
+    UNDOCK: { state: initialState(SEED), action: { type: 'UNDOCK' } },
 };
 
 test('should have durationOf return null for unknown or malformed actions', () => {
