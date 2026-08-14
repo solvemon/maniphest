@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reduce } from './reduce.ts';
 import { initialState } from './state.ts';
-import { JUMP_TICKS_PER_DISTANCE } from './movement.ts';
+import { DOCKING_TICKS, JUMP_TICKS_PER_DISTANCE } from './movement.ts';
 import { distanceBetween } from '../map/index.ts';
 
 /**
@@ -47,4 +47,21 @@ test('should leave the ship in space at the destination after a jump', () => {
 
     assert.equal(jumped.player.systemId, 'vega');
     assert.equal(jumped.player.docked, false);
+});
+
+test('should derive each action\'s tick delta from the map/movement constants, not a hardcoded number', () => {
+    const start = initialState(SEED);
+
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assert.equal(undocked.tick - start.tick, DOCKING_TICKS);
+
+    const jumped = reduce(undocked, { type: 'JUMP', systemId: 'vega' });
+    const expectedJumpTicks = (distanceBetween('sol', 'vega') ?? 0) * JUMP_TICKS_PER_DISTANCE;
+
+    assert.equal(jumped.tick - undocked.tick, expectedJumpTicks);
+
+    const docked = reduce(jumped, { type: 'DOCK' });
+
+    assert.equal(docked.tick - jumped.tick, DOCKING_TICKS);
 });
