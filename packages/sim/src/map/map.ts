@@ -17,3 +17,12 @@ export const SYSTEMS: readonly System[] = [
     { id: 'sol', name: 'Sol' },
     { id: 'vega', name: 'Vega' },
 ];
+
+/**
+ * The system the ship starts at.
+ *
+ * This is derived from `SYSTEMS` rather than a second hardcoded id: "the
+ * ship starts at the first system" is a structural rule about the map, not
+ * an independent fact that could drift out of sync with `SYSTEMS`.
+ */
+export const HOME_SYSTEM_ID = SYSTEMS[0]!.id;
