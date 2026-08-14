@@ -65,3 +65,26 @@ for (const system of SYSTEMS) {
 export function systemById(id: string): System | null {
     return BY_ID[id] ?? null;
 }
+
+/**
+ * Looks up the distance between two systems by id.
+ *
+ * Returns `null` if either id fails `systemById`, so callers can turn a bad
+ * id into a `Rejection` result instead of an exception unwinding the call
+ * stack. Returns `0` when `a` and `b` are the same id, without consulting
+ * `DISTANCES`. Otherwise builds the order-independent pair key via
+ * `[a, b].sort().join('|')` and looks it up in `DISTANCES`, returning `null`
+ * if no distance is recorded for that pair. Never throws.
+ */
+export function distanceBetween(a: string, b: string): number | null {
+    if (systemById(a) === null || systemById(b) === null) {
+        return null;
+    }
+
+    if (a === b) {
+        return 0;
+    }
+
+    const key = [a, b].sort().join('|');
+    return DISTANCES[key] ?? null;
+}
