@@ -43,3 +43,21 @@ test('should give every ordered pair of distinct systems a positive integer dist
         }
     }
 });
+
+test('should give every ordered pair of systems a symmetric distance', () => {
+    for (const a of SYSTEMS) {
+        for (const b of SYSTEMS) {
+            assert.equal(
+                distanceBetween(a.id, b.id),
+                distanceBetween(b.id, a.id),
+                `distance from '${a.id}' to '${b.id}' should equal distance from '${b.id}' to '${a.id}'`,
+            );
+        }
+    }
+});
+
+test('should give a zero distance from a system to itself', () => {
+    for (const system of SYSTEMS) {
+        assert.equal(distanceBetween(system.id, system.id), 0);
+    }
+});
