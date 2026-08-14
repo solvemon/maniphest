@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reduce } from './reduce.ts';
+import { reduce, durationOf } from './reduce.ts';
 import { initialState } from './state.ts';
 import type { State } from './state.ts';
 import type { RejectionReason } from './rejection.ts';
@@ -251,4 +251,33 @@ test('should reject a docked-only action with NOT_DOCKED when undocked (M0-07 ga
     } finally {
         delete ACTIONS[TEST_TYPE];
     }
+});
+
+test('should preview a legal JUMP from sol to vega as SOL_TO_VEGA_JUMP_TICKS (20)', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assert.equal(durationOf(undocked, { type: 'JUMP', systemId: 'vega' }), SOL_TO_VEGA_JUMP_TICKS);
+    assert.equal(durationOf(undocked, { type: 'JUMP', systemId: 'vega' }), 20);
+});
+
+test('should preview JUMP as null while docked (posture gate mirrored from reduce)', () => {
+    const start = initialState(SEED);
+
+    assert.equal(durationOf(start, { type: 'JUMP', systemId: 'vega' }), null);
+});
+
+test('should preview DOCK and UNDOCK as DOCKING_TICKS from their respective legal postures', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assert.equal(durationOf(undocked, { type: 'DOCK' }), DOCKING_TICKS);
+    assert.equal(durationOf(start, { type: 'UNDOCK' }), DOCKING_TICKS);
+});
+
+test('should preview a malformed JUMP (non-string systemId) as null', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assert.equal(durationOf(undocked, { type: 'JUMP', systemId: 42 }), null);
 });
