@@ -274,13 +274,16 @@ test('should compute duration from the pre-action state, not the post-apply stat
 });
 
 /**
- * One sample action per registered type, used below to prove `durationOf`
- * agrees with the tick delta `reduce` actually produces. Keyed by
- * `action.type` so M0-04+ can append a sample alongside each new registry
- * entry without touching the assertion itself.
+ * One sample per registered action type, used below to prove `durationOf`
+ * agrees with the tick delta `reduce` actually produces. Each sample pairs
+ * the `action` with the `state` it must be driven from, since some actions
+ * (e.g. JUMP) only produce a meaningful duration from a specific state -
+ * driving them from a bare `initialState` would silently observe a tick
+ * delta of 0. Keyed by `action.type` so M0-04+ can append a sample alongside
+ * each new registry entry without touching the assertion itself.
  */
-const SAMPLE_ACTIONS: Record<string, unknown> = {
-    WAIT: { type: 'WAIT', n: 4 },
+const SAMPLE_ACTIONS: Record<string, { state: State; action: unknown }> = {
+    WAIT: { state: initialState(SEED), action: { type: 'WAIT', n: 4 } },
 };
 
 test('should have durationOf return null for unknown or malformed actions', () => {
@@ -319,10 +322,10 @@ test('should have durationOf agree with the tick delta reduce actually produces,
             `no sample action registered for type '${type}' in SAMPLE_ACTIONS - add one so this test covers it`,
         );
 
-        const sample = SAMPLE_ACTIONS[type];
-        const state = deepFreeze(initialState(SEED));
-        const predicted = durationOf(state, sample);
-        const next = reduce(state, sample);
+        const sample = SAMPLE_ACTIONS[type]!;
+        const state = deepFreeze(sample.state);
+        const predicted = durationOf(state, sample.action);
+        const next = reduce(state, sample.action);
 
         assert.equal(next.tick - state.tick, predicted, `durationOf(${type}) disagreed with the observed reduce tick delta`);
     }
