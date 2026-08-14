@@ -76,6 +76,11 @@ export interface ActionSpec {
    * held across a reducer boundary; each `apply` call gets its own.
    */
   apply(state: State, action: unknown): State | Rejection;
+  /**
+   * The ship posture required for this action to be legal — `'docked'` or
+   * `'inSpace'`. Absent ⇒ legal in either posture.
+   */
+  requires?: 'docked' | 'inSpace';
 }
 
 /**
@@ -103,6 +108,11 @@ export function defineAction<A>(spec: {
   parse: (raw: Record<string, unknown>) => A | Rejection;
   duration: (state: State, action: A) => number;
   apply: (state: State, action: A) => State | Rejection;
+  /**
+   * The ship posture required for this action to be legal — `'docked'` or
+   * `'inSpace'`. Absent ⇒ legal in either posture.
+   */
+  requires?: 'docked' | 'inSpace';
 }): ActionSpec {
   return {
     parse: (raw) => spec.parse(raw),
