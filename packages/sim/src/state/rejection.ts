@@ -5,16 +5,35 @@
  * forbids enums, and a literal union turns a typo'd reason into a compile
  * error instead of a silently divergent rejection.
  *
- * This union only carries the two reasons that apply universally, before
- * any domain-specific validation runs. Later issues extend it with more
- * specific reasons as their subsystems land:
+ * Beyond `MALFORMED_ACTION` and `INVALID_ARGUMENT`, which apply universally
+ * before any domain-specific validation runs, this union carries the
+ * movement-posture and system-map reasons added by M0-04:
  *
- * - M0-04 adds `NOT_DOCKED` and `SAME_SYSTEM`.
+ * - `NOT_IN_SPACE` covers both a `JUMP` attempted while docked and a `DOCK`
+ *   attempted while already docked - both require the ship to be in open
+ *   space first.
+ * - `NOT_DOCKED` is the posture failure for an action that requires being
+ *   docked. Nothing in this issue emits it yet; it is the reason M0-07's
+ *   trading gate will use to reject trading while in space.
+ * - `SAME_SYSTEM` rejects a `JUMP` whose destination is the system the ship
+ *   is already in.
+ * - `UNKNOWN_SYSTEM` rejects a `JUMP` whose destination does not exist in
+ *   the system map.
+ *
+ * Later issues extend it with more specific reasons as their subsystems
+ * land:
+ *
  * - M0-05 adds `INSUFFICIENT_FUEL` and `NO_DEPOT`.
  * - M0-07 adds `INSUFFICIENT_CREDITS`, `INSUFFICIENT_CARGO_SPACE`, and
  *   `INSUFFICIENT_STOCK`.
  */
-export type RejectionReason = 'MALFORMED_ACTION' | 'INVALID_ARGUMENT';
+export type RejectionReason =
+  | 'MALFORMED_ACTION'
+  | 'INVALID_ARGUMENT'
+  | 'NOT_DOCKED'
+  | 'NOT_IN_SPACE'
+  | 'SAME_SYSTEM'
+  | 'UNKNOWN_SYSTEM';
 
 /**
  * The result of an action that was not applied.
