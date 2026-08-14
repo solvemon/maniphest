@@ -281,3 +281,22 @@ test('should preview a malformed JUMP (non-string systemId) as null', () => {
 
     assert.equal(durationOf(undocked, { type: 'JUMP', systemId: 42 }), null);
 });
+
+test('should strip a stray property from an accepted DOCK action before it reaches state', () => {
+    // `DOCK`'s `parse` rebuilds `{ type: 'DOCK' }` from scratch (a
+    // zero-argument spec), so an accepted action carrying an extra property
+    // must be normalized away rather than merged into `next` verbatim. This
+    // is the accepted-path counterpart to `assertRejected`'s verbatim-action
+    // note above: here the action is legal, so `next` must show no trace of
+    // `sneaky` anywhere - not just in `lastRejection.action`, but nowhere in
+    // the resulting state at all.
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    const docked = reduce(undocked, { type: 'DOCK', sneaky: 'x' });
+
+    assert.equal(docked.tick, undocked.tick + DOCKING_TICKS);
+    assert.equal(docked.player.docked, true);
+    assert.equal(docked.lastRejection, null);
+    assert.ok(!JSON.stringify(docked).includes('sneaky'));
+});
