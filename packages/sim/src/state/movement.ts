@@ -6,6 +6,14 @@
  * and undocking all live here rather than in `registry.ts`, so the registry
  * stays a pure lookup table (per its own doc comment) and this file stays
  * the single place movement-specific behavior can change.
+ *
+ * Invariant: each spec's `requires` field ('inSpace' or 'docked') is the
+ * only place posture legality is expressed. No `parse`, `duration`, or
+ * `apply` body below may read `state.player.docked` — that check belongs
+ * solely to `requires`, which the driver enforces before the handler ever
+ * runs. Reading `state.player.systemId` (the ship's position, not its
+ * posture) is unrelated to this invariant and remains fine, as `jumpSpec`'s
+ * `duration` does.
  */
 
 import type { DockAction, JumpAction, UndockAction } from './actions.ts';
