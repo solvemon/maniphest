@@ -6,6 +6,9 @@ import type { State } from './state.ts';
 import type { RejectionReason } from './rejection.ts';
 import { DOCKING_TICKS, JUMP_TICKS_PER_DISTANCE } from './movement.ts';
 import { distanceBetween } from '../map/index.ts';
+import { ACTIONS } from './registry.ts';
+import { defineAction } from './actions.ts';
+import { reject } from './rejection.ts';
 
 /**
  * Shared fixtures and helpers for `movement.test.ts`. Kept at the top of the
@@ -203,4 +206,49 @@ test('should derive each action\'s tick delta from the map/movement constants, n
     const docked = reduce(jumped, { type: 'DOCK' });
 
     assert.equal(docked.tick - jumped.tick, DOCKING_TICKS);
+});
+
+test('should reject a docked-only action with NOT_DOCKED when undocked (M0-07 gate proof)', () => {
+    // `reduce`'s posture gate (reduce.ts) rejects ANY spec declaring
+    // `requires: 'docked'` while `state.player.docked` is false - it does not
+    // special-case movement. M0-07 (BUY/SELL) is the first real consumer of
+    // that branch, but M0-07 hasn't landed yet, so this test proves the gate
+    // itself works by registering a throwaway spec that only exists to carry
+    // `requires: 'docked'`.
+    //
+    // `ACTIONS` (registry.ts) is declared `export const` but is a plain,
+    // unfrozen `Record<string, ActionSpec>` built once via
+    // `Object.assign(Object.create(null), {...})` - there is no
+    // `Object.freeze`, so assigning a new key on it here is a real mutation
+    // of the exact object `reduce` looks up through, not a copy. No cast is
+    // needed for the assignment itself (`ACTIONS` is already typed
+    // `Record<string, ActionSpec>`, so a fresh string key is legal by that
+    // type alone); the one cast below is `parse`'s return type, needed only
+    // because `defineAction`'s generic parameter can't be inferred from an
+    // arrow function whose branches return two unrelated shapes (the parsed
+    // action vs. `Rejection`) without an explicit type argument.
+    //
+    // Registered under a type string no production code will ever emit
+    // (`'__TEST_DOCKED_ONLY__'`), and removed in `finally` so no other test
+    // in this file - or a run in a different order - can observe it.
+    const TEST_TYPE = '__TEST_DOCKED_ONLY__';
+    interface TestDockedOnlyAction {
+        type: typeof TEST_TYPE;
+    }
+
+    ACTIONS[TEST_TYPE] = defineAction<TestDockedOnlyAction>({
+        parse: (raw) => (raw.type === TEST_TYPE ? { type: TEST_TYPE } : reject('INVALID_ARGUMENT')),
+        duration: () => 0,
+        apply: (state) => state,
+        requires: 'docked',
+    });
+
+    try {
+        const start = initialState(SEED);
+        const undocked = reduce(start, { type: 'UNDOCK' });
+
+        assertRejected(undocked, { type: TEST_TYPE }, 'NOT_DOCKED');
+    } finally {
+        delete ACTIONS[TEST_TYPE];
+    }
 });
