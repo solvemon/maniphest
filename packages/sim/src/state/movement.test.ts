@@ -9,6 +9,7 @@ import { distanceBetween } from '../map/index.ts';
 import { ACTIONS } from './registry.ts';
 import { defineAction } from './actions.ts';
 import { reject } from './rejection.ts';
+import { findUndefined } from './test-helpers.ts';
 
 /**
  * Shared fixtures and helpers for `movement.test.ts`. Kept at the top of the
@@ -300,3 +301,143 @@ test('should strip a stray property from an accepted DOCK action before it reach
     assert.equal(docked.lastRejection, null);
     assert.ok(!JSON.stringify(docked).includes('sneaky'));
 });
+
+/**
+ * Recursively freezes `value` in place: every plain object and array
+ * reachable from it (including `value` itself) is frozen with
+ * `Object.freeze`, so a later attempt to mutate it throws instead of
+ * silently succeeding or silently no-oping.
+ *
+ * Duplicated from `reduce.test.ts` rather than imported: a helper shared
+ * across multiple test files must live in a non-`*.test.ts` module (see
+ * `test-helpers.ts`'s doc comment) to avoid Node's test runner re-executing
+ * the source file's `test()` registrations as a side effect of the import,
+ * and `deepFreeze` isn't needed anywhere outside these two test files, so it
+ * isn't worth promoting to `test-helpers.ts` for that alone.
+ *
+ * Used by the tests below to prove that `reduce` never mutates the `state`
+ * it is given for the movement actions introduced in this issue (`UNDOCK`,
+ * `JUMP`, `DOCK`) — passing a deep-frozen state in means any in-place write
+ * inside `reduce` or a movement handler throws immediately rather than
+ * passing unnoticed.
+ */
+function deepFreeze<T>(value: T): T {
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            deepFreeze(item);
+        }
+        Object.freeze(value);
+        return value;
+    }
+    if (typeof value === 'object' && value !== null) {
+        for (const key of Object.keys(value)) {
+            deepFreeze((value as Record<string, unknown>)[key]);
+        }
+        Object.freeze(value);
+        return value;
+    }
+    return value;
+}
+
+/**
+ * Asserts that `next` — the result of an accepted or rejected movement
+ * action — round-trips through `JSON.parse(JSON.stringify(...))` with no
+ * loss and contains no `undefined` anywhere in its shape, per the `State`
+ * invariants documented in `state.ts` (no optional fields, JSON-round-trips
+ * unchanged). `findUndefined` is reused from `test-helpers.ts` (M0-03)
+ * rather than reimplemented here.
+ */
+function assertPureAndSerializable(next: State): void {
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(next)), next);
+    assert.deepStrictEqual(findUndefined(next), []);
+}
+
+test('should round-trip an accepted UNDOCK through JSON with no undefined fields, and never mutate or throw on a frozen input', () => {
+    const start = deepFreeze(initialState(SEED));
+    const before = JSON.stringify(start);
+
+    assert.doesNotThrow(() => reduce(start, { type: 'UNDOCK' }));
+    assert.equal(JSON.stringify(start), before);
+
+    const undocked = reduce(start, { type: 'UNDOCK' });
+    assertPureAndSerializable(undocked);
+});
+
+test('should round-trip an accepted JUMP through JSON with no undefined fields, and never mutate or throw on a frozen input', () => {
+    const start = initialState(SEED);
+    const undocked = deepFreeze(reduce(start, { type: 'UNDOCK' }));
+    const before = JSON.stringify(undocked);
+
+    assert.doesNotThrow(() => reduce(undocked, { type: 'JUMP', systemId: 'vega' }));
+    assert.equal(JSON.stringify(undocked), before);
+
+    const jumped = reduce(undocked, { type: 'JUMP', systemId: 'vega' });
+    assertPureAndSerializable(jumped);
+});
+
+test('should round-trip an accepted DOCK through JSON with no undefined fields, and never mutate or throw on a frozen input', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+    const jumped = deepFreeze(reduce(undocked, { type: 'JUMP', systemId: 'vega' }));
+    const before = JSON.stringify(jumped);
+
+    assert.doesNotThrow(() => reduce(jumped, { type: 'DOCK' }));
+    assert.equal(JSON.stringify(jumped), before);
+
+    const docked = reduce(jumped, { type: 'DOCK' });
+    assertPureAndSerializable(docked);
+});
+
+/**
+ * One rejection case per posture/system-map/argument reason this issue can
+ * produce, each paired with the (deep-frozen) state its action is rejected
+ * from:
+ *
+ * - `NOT_DOCKED` — `UNDOCK` while already in space.
+ * - `NOT_IN_SPACE` — `DOCK` while already docked.
+ * - `SAME_SYSTEM` — `JUMP` to the system the ship is already in.
+ * - `UNKNOWN_SYSTEM` — `JUMP` to a destination id absent from the map.
+ * - `INVALID_ARGUMENT` — `JUMP` with a malformed `systemId`.
+ *
+ * Both `start` and `undocked` are frozen once here and shared by every case
+ * below: `reduce` never mutates its input (that is exactly what these tests
+ * prove), so a case built from one of these fixtures observing the other's
+ * rejection has nothing to worry about.
+ */
+function rejectionCases(): Array<{ reason: RejectionReason; prev: State; action: unknown }> {
+    const start = deepFreeze(initialState(SEED));
+    const undocked = deepFreeze(reduce(start, { type: 'UNDOCK' }));
+
+    return [
+        { reason: 'NOT_DOCKED', prev: undocked, action: { type: 'UNDOCK' } },
+        { reason: 'NOT_IN_SPACE', prev: start, action: { type: 'DOCK' } },
+        {
+            reason: 'SAME_SYSTEM',
+            prev: undocked,
+            action: { type: 'JUMP', systemId: undocked.player.systemId },
+        },
+        {
+            reason: 'UNKNOWN_SYSTEM',
+            prev: undocked,
+            action: { type: 'JUMP', systemId: 'nonexistent' },
+        },
+        {
+            reason: 'INVALID_ARGUMENT',
+            prev: undocked,
+            action: { type: 'JUMP', systemId: 42 },
+        },
+    ];
+}
+
+for (const { reason, prev, action } of rejectionCases()) {
+    test(`should round-trip a ${reason} rejection through JSON with no undefined fields, and never mutate or throw on a frozen input`, () => {
+        const before = JSON.stringify(prev);
+
+        assert.doesNotThrow(() => reduce(prev, action));
+        assert.equal(JSON.stringify(prev), before);
+
+        const rejected = reduce(prev, action);
+        assert.equal(rejected.lastRejection?.reason, reason);
+        assertPureAndSerializable(rejected);
+    });
+}
