@@ -118,6 +118,19 @@ export function reduce(state: State, action: unknown): State {
  * is computed from the pre-action `state` alone, so a caller can ask "how
  * long would this take" before deciding whether to commit to it.
  *
+ * The posture gate is mirrored here from `reduce` (same `spec.requires`
+ * check against `state.player.docked`) because it is state-independent of
+ * `apply` and cheap to re-derive, so a gated action previews as `null`
+ * rather than a misleading tick count for a jump that can never be applied.
+ *
+ * Semantic rejections a handler's own `apply` would raise — e.g. `JUMP`'s
+ * `SAME_SYSTEM` / `UNKNOWN_SYSTEM` — are deliberately *not* mirrored here.
+ * Reproducing them would mean duplicating each handler's `apply` logic
+ * inside the preview path, and `reduce` must remain the sole authority on
+ * legality: an illegal jump previews as `0` ticks (from `spec.duration`)
+ * rather than `null`, and the caller only learns it was illegal by actually
+ * dispatching the action through `reduce` and inspecting `lastRejection`.
+ *
  * Wrapped in the same try/catch fallback as `reduce`, for the same reason:
  * a hostile `action` (e.g. a throwing getter) can throw while merely being
  * read, before any guard or `parse` call gets a chance to reject it as
@@ -131,6 +144,9 @@ export function durationOf(state: State, action: unknown): number | null {
 
     const parsed = spec.parse(action);
     if (isRejection(parsed)) return null;
+
+    if (spec.requires === 'docked' && !state.player.docked) return null;
+    if (spec.requires === 'inSpace' && state.player.docked) return null;
 
     return spec.duration(state, parsed);
   } catch {
