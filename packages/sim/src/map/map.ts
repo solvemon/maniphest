@@ -26,3 +26,31 @@ export const SYSTEMS: readonly System[] = [
  * an independent fact that could drift out of sync with `SYSTEMS`.
  */
 export const HOME_SYSTEM_ID = SYSTEMS[0]!.id;
+
+/**
+ * Inter-system distances, keyed by an order-independent pair key.
+ *
+ * A pair of system ids `a` and `b` is keyed by `[a, b].sort().join('|')`, so
+ * the two ids are sorted before joining. That canonical key is independent
+ * of travel direction, so a single entry covers both `a` to `b` and `b` to
+ * `a` — there is no need for a separate reverse entry.
+ *
+ * Built on a null-prototype object (via `Object.create(null)`) so lookups
+ * can never accidentally resolve to an inherited property such as
+ * `toString` or `constructor`.
+ */
+const DISTANCES: Record<string, number> = Object.assign(Object.create(null), {
+    'sol|vega': 10,
+});
+
+/**
+ * Lookup of every system in `SYSTEMS`, indexed by its id.
+ *
+ * Built on a null-prototype object (via `Object.create(null)`) so lookups
+ * can never accidentally resolve to an inherited property such as
+ * `toString` or `constructor`.
+ */
+const BY_ID: Record<string, System> = Object.create(null);
+for (const system of SYSTEMS) {
+    BY_ID[system.id] = system;
+}
