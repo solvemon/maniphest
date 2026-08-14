@@ -85,6 +85,20 @@ export function reduce(state: State, action: unknown): State {
     const parsed = spec.parse(action);
     if (isRejection(parsed)) return rejectInto(state, { type: action.type }, parsed.reason);
 
+    // Posture gate sits strictly between `parse` and `apply`: shape validity
+    // (parse) is state-independent, so it is checked first and rejects on
+    // its own terms before anything looks at `state`. Posture legality
+    // depends on `state.player.docked`, so it cannot run any earlier than
+    // this — but it is still a cheaper, more generic check than a handler's
+    // own `apply` logic, so it runs before `apply` rather than being left
+    // for each handler to reimplement.
+    if (spec.requires === 'docked' && !state.player.docked) {
+      return rejectInto(state, parsed, 'NOT_DOCKED');
+    }
+    if (spec.requires === 'inSpace' && state.player.docked) {
+      return rejectInto(state, parsed, 'NOT_IN_SPACE');
+    }
+
     const applied = spec.apply(state, parsed);
     if (isRejection(applied)) return rejectInto(state, parsed, applied.reason);
 
