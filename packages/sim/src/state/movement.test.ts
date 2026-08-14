@@ -37,3 +37,14 @@ test('should run the happy movement loop UNDOCK -> JUMP vega -> DOCK from initia
     assert.deepEqual(docked.player, { systemId: 'vega', docked: true });
     assert.equal(docked.lastRejection, null);
 });
+
+test('should leave the ship in space at the destination after a jump', () => {
+    const start = initialState(SEED);
+
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    const jumped = reduce(undocked, { type: 'JUMP', systemId: 'vega' });
+
+    assert.equal(jumped.player.systemId, 'vega');
+    assert.equal(jumped.player.docked, false);
+});
