@@ -7,5 +7,11 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  // "src/**/*.test.ts": test files themselves.
+  // "src/**/test-helpers.ts": test-only support code (e.g. state/test-helpers.ts,
+  // shared by state.test.ts and reduce.test.ts) that must not ship in dist/,
+  // even though its filename doesn't end in ".test.ts". It's still
+  // type-checked transitively via tsconfig.test.json, which pulls it in
+  // through the test files that import it.
+  "exclude": ["src/**/*.test.ts", "src/**/test-helpers.ts"]
 }

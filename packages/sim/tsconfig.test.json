@@ -8,6 +8,11 @@
     "allowImportingTsExtensions": true,
     "rootDir": "src"
   },
-  "include": ["src/**/*.test.ts"],
+  // "src/**/test-helpers.ts": test-only support code that isn't itself a
+  // "*.test.ts" file (see the comment on that exclude entry in
+  // tsconfig.json). It's excluded from the main build's file list, so it
+  // must be listed here explicitly for typecheck to see it as a project file
+  // rather than erroring with TS6307.
+  "include": ["src/**/*.test.ts", "src/**/test-helpers.ts"],
   "references": [{ "path": "./tsconfig.json" }]
 }

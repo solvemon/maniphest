@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mix64, toFloat53, hashString } from './splitmix64.ts';
+import { toUint64 } from './index.ts';
 
 const GOLDEN_GAMMA = 0x9e3779b97f4a7c15n;
 const MASK_64 = (1n << 64n) - 1n;
@@ -56,4 +57,8 @@ test('should match pinned golden hashString values', () => {
     assert.equal(hashString('system'), 13814046143737672956n);
     assert.equal(hashString('planets'), 2183907289433885728n);
     assert.equal(hashString(''), 14695981039346656037n);
+});
+
+test('should keep toUint64 reachable through the rng barrel export', () => {
+    assert.equal(toUint64(-1), 0xffffffffffffffffn);
 });
