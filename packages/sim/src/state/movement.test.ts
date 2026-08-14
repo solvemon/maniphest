@@ -49,11 +49,97 @@ function assertRejected(prev: State, action: unknown, expected: RejectionReason)
     );
 }
 
+/**
+ * Asserts that `reduce(prev, action)` rejects `action` with `expected`
+ * because `action` fails a spec's `parse` outright — e.g. a `JUMP` whose
+ * `systemId` is not a valid non-empty string.
+ *
+ * Deliberately not {@link assertRejected}: `reduce`'s `rejectInto` call for
+ * a parse-stage rejection stores only `{ type: action.type }` in
+ * `lastRejection.action` (see `reduce.ts`), discarding whatever malformed
+ * value `action` carried — a value that failed `parse` may not even be
+ * JSON-safe (`NaN`, `undefined`, a cyclic reference, ...), so it must never
+ * reach `lastRejection` verbatim. `assertRejected` checks the recorded
+ * action against `action` itself, which only holds for a spec whose
+ * `parse` succeeded; this variant checks it against that trimmed
+ * `{ type: action.type }` shape instead, and is otherwise identical.
+ */
+function assertRejectedMalformed(
+    prev: State,
+    action: Record<string, unknown>,
+    expected: RejectionReason,
+): void {
+    const next = reduce(prev, action);
+
+    assert.notEqual(next, prev);
+    assert.equal(next.tick, prev.tick);
+    assert.equal(next.lastRejection?.reason, expected);
+    assert.deepStrictEqual(next.lastRejection?.action, { type: action['type'] });
+    assert.equal(
+        JSON.stringify({ ...next, lastRejection: null }),
+        JSON.stringify({ ...prev, lastRejection: null }),
+    );
+}
+
 test('should reject UNDOCK with NOT_DOCKED when the ship is already in space', () => {
     const start = initialState(SEED);
     const undocked = reduce(start, { type: 'UNDOCK' });
 
     assertRejected(undocked, { type: 'UNDOCK' }, 'NOT_DOCKED');
+});
+
+test('should reject JUMP with SAME_SYSTEM when the destination is the current system', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assertRejected(undocked, { type: 'JUMP', systemId: undocked.player.systemId }, 'SAME_SYSTEM');
+});
+
+test('should reject JUMP with UNKNOWN_SYSTEM when the destination id is not in the map', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assertRejected(undocked, { type: 'JUMP', systemId: 'nonexistent' }, 'UNKNOWN_SYSTEM');
+});
+
+test('should reject JUMP with NOT_IN_SPACE when the ship is docked', () => {
+    const start = initialState(SEED);
+
+    assertRejected(start, { type: 'JUMP', systemId: 'vega' }, 'NOT_IN_SPACE');
+});
+
+test('should reject DOCK with NOT_IN_SPACE when the ship is already docked', () => {
+    const start = initialState(SEED);
+
+    assertRejected(start, { type: 'DOCK' }, 'NOT_IN_SPACE');
+});
+
+test('should reject JUMP with INVALID_ARGUMENT when systemId is missing', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assertRejectedMalformed(undocked, { type: 'JUMP' }, 'INVALID_ARGUMENT');
+});
+
+test('should reject JUMP with INVALID_ARGUMENT when systemId is not a string (42)', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assertRejectedMalformed(undocked, { type: 'JUMP', systemId: 42 }, 'INVALID_ARGUMENT');
+});
+
+test('should reject JUMP with INVALID_ARGUMENT when systemId is null', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assertRejectedMalformed(undocked, { type: 'JUMP', systemId: null }, 'INVALID_ARGUMENT');
+});
+
+test('should reject JUMP with INVALID_ARGUMENT when systemId is an empty string', () => {
+    const start = initialState(SEED);
+    const undocked = reduce(start, { type: 'UNDOCK' });
+
+    assertRejectedMalformed(undocked, { type: 'JUMP', systemId: '' }, 'INVALID_ARGUMENT');
 });
 
 test('should run the happy movement loop UNDOCK -> JUMP vega -> DOCK from initialState(SEED)', () => {
