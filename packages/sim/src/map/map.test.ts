@@ -79,3 +79,26 @@ test('should resolve unknown and prototype-named system ids to null', () => {
         assert.equal(systemById(id), null, `systemById('${id}') should be null`);
     }
 });
+
+test('should give a null distance for any pairing involving a prototype-named id', () => {
+    assert.equal(distanceBetween('toString', 'sol'), null);
+    assert.equal(distanceBetween('sol', 'constructor'), null);
+    assert.equal(distanceBetween('__proto__', '__proto__'), null);
+});
+
+// `DISTANCES` and `BY_ID` are module-private (exporting them would widen the
+// public surface just to test an implementation detail), so this asserts
+// their null-prototype-ness indirectly: if either object had `Object.prototype`
+// in its chain, looking up a prototype property name like `toString` or
+// `constructor` would resolve to the inherited function/property instead of
+// `undefined`, and `systemById`/`distanceBetween` would leak that value
+// instead of falling back to `null`. The two tests above (plus the
+// `systemById` prototype-named-id test) already exercise every observable
+// path that could leak such a value, so together they demonstrate both
+// lookup tables are prototype-free.
+test('should keep both internal lookup tables prototype-free', () => {
+    for (const id of ['toString', 'constructor', '__proto__', 'hasOwnProperty', 'valueOf']) {
+        assert.equal(systemById(id), null, `systemById('${id}') should be null`);
+        assert.equal(distanceBetween(id, HOME_SYSTEM_ID), null, `distanceBetween('${id}', '${HOME_SYSTEM_ID}') should be null`);
+    }
+});
