@@ -1,5 +1,6 @@
 import { hashString, mix64, toUint64 } from '../rng/index.ts';
 import type { RngState } from '../rng/index.ts';
+import { HOME_SYSTEM_ID } from '../map/index.ts';
 import type { RejectionReason } from './rejection.ts';
 
 /**
@@ -18,12 +19,6 @@ import type { RejectionReason } from './rejection.ts';
  * state. That logic arrives in M0-10.
  */
 export const STATE_VERSION = 1;
-
-/**
- * Slice-0 placeholder for the player's starting system. M0-04 replaces this
- * with a real map-derived system id once the map exists.
- */
-const HOME_SYSTEM_ID = 'home';
 
 /**
  * Slice-0 placeholder starting fuel. Tuned for real balance in M0-05.
