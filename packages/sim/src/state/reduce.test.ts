@@ -317,6 +317,11 @@ test('should have every ACTIONS entry fully specify parse, duration, and apply a
                 `ACTIONS['${type}'] is missing a function '${member}' member`,
             );
         }
+
+        assert.ok(
+            spec.requires === undefined || spec.requires === 'docked' || spec.requires === 'inSpace',
+            `ACTIONS['${type}'].requires must be undefined, 'docked', or 'inSpace'`,
+        );
     }
 });
 
