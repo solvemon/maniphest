@@ -61,3 +61,21 @@ test('should give a zero distance from a system to itself', () => {
         assert.equal(distanceBetween(system.id, system.id), 0);
     }
 });
+
+test('should give a null distance when the origin system id is unknown', () => {
+    assert.equal(distanceBetween('nope', 'sol'), null);
+});
+
+test('should give a null distance when the destination system id is unknown', () => {
+    assert.equal(distanceBetween('sol', 'nope'), null);
+});
+
+test('should give a null distance when both system ids are unknown', () => {
+    assert.equal(distanceBetween('nope', 'nah'), null);
+});
+
+test('should resolve unknown and prototype-named system ids to null', () => {
+    for (const id of ['nope', 'toString', '__proto__', 'constructor']) {
+        assert.equal(systemById(id), null, `systemById('${id}') should be null`);
+    }
+});
