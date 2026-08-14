@@ -142,6 +142,18 @@ test('should reject JUMP with INVALID_ARGUMENT when systemId is an empty string'
     assertRejectedMalformed(undocked, { type: 'JUMP', systemId: '' }, 'INVALID_ARGUMENT');
 });
 
+test('should reject JUMP with NOT_IN_SPACE for an unknown destination while docked (gate precedes apply)', () => {
+    const start = initialState(SEED);
+
+    assertRejected(start, { type: 'JUMP', systemId: 'nonexistent' }, 'NOT_IN_SPACE');
+});
+
+test('should reject JUMP with INVALID_ARGUMENT for a malformed systemId (42) while docked (parse precedes gate)', () => {
+    const start = initialState(SEED);
+
+    assertRejectedMalformed(start, { type: 'JUMP', systemId: 42 }, 'INVALID_ARGUMENT');
+});
+
 test('should run the happy movement loop UNDOCK -> JUMP vega -> DOCK from initialState(SEED)', () => {
     const start = initialState(SEED);
 
