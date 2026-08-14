@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, STATE_VERSION } from './state.ts';
 import { eventRng } from '../rng/index.ts';
+import { HOME_SYSTEM_ID, systemById } from '../map/index.ts';
 import { findUndefined } from './test-helpers.ts';
 
 /**
@@ -103,9 +104,16 @@ test('should populate initialState(SEED) with the Slice-0 placeholder values', (
     assert.equal(s.vessel.hull, 100);
     assert.equal(s.vessel.cargoCapacity, 50);
     assert.equal(s.credits, 1000);
-    assert.deepEqual(s.player, { systemId: 'home', docked: true });
+    assert.deepEqual(s.player, { systemId: HOME_SYSTEM_ID, docked: true });
     assert.deepEqual(s.vessel.cargo, {});
     assert.equal(s.lastRejection, null);
     assert.equal(s.tick, 0);
     assert.equal(s.worldSeed, SEED);
+});
+
+test('should start docked at a system that exists in the map', () => {
+    const s = initialState(SEED);
+
+    assert.notEqual(systemById(s.player.systemId), null);
+    assert.equal(s.player.docked, true);
 });
