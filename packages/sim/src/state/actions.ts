@@ -10,17 +10,39 @@ export interface WaitAction {
 }
 
 /**
+ * Moves the ship to `systemId`, the destination system of a lane in the
+ * two-system map.
+ */
+export interface JumpAction {
+  type: 'JUMP';
+  systemId: string;
+}
+
+/**
+ * Docks the ship at a station in its current system.
+ */
+export interface DockAction {
+  type: 'DOCK';
+}
+
+/**
+ * Undocks the ship from a station, returning it to open space.
+ */
+export interface UndockAction {
+  type: 'UNDOCK';
+}
+
+/**
  * The set of actions a reducer can apply to a {@link State}.
  *
- * Deliberately a single-member union for now: `WaitAction` is the only
- * action slice-0 needs. Later issues widen this union as their subsystems
+ * `WaitAction`, `JumpAction`, `DockAction`, and `UndockAction` are the
+ * actions slice-0 needs. Later issues widen this union as their subsystems
  * land:
  *
- * - M0-04 adds `JumpAction`, `DockAction`, and `UndockAction`.
  * - M0-05 adds `RefuelAction`.
  * - M0-07 adds `BuyAction` and `SellAction`.
  */
-export type Action = WaitAction;
+export type Action = WaitAction | JumpAction | DockAction | UndockAction;
 
 /**
  * The driver-facing, monomorphic shape every action kind implements.
@@ -54,6 +76,11 @@ export interface ActionSpec {
    * held across a reducer boundary; each `apply` call gets its own.
    */
   apply(state: State, action: unknown): State | Rejection;
+  /**
+   * The ship posture required for this action to be legal — `'docked'` or
+   * `'inSpace'`. Absent ⇒ legal in either posture.
+   */
+  requires?: 'docked' | 'inSpace';
 }
 
 /**
@@ -81,10 +108,19 @@ export function defineAction<A>(spec: {
   parse: (raw: Record<string, unknown>) => A | Rejection;
   duration: (state: State, action: A) => number;
   apply: (state: State, action: A) => State | Rejection;
+  /**
+   * The ship posture required for this action to be legal — `'docked'` or
+   * `'inSpace'`. Absent ⇒ legal in either posture.
+   */
+  requires?: 'docked' | 'inSpace';
 }): ActionSpec {
   return {
     parse: (raw) => spec.parse(raw),
     duration: (state, action) => spec.duration(state, action as A), // the ONE cast
     apply: (state, action) => spec.apply(state, action as A), // the ONE cast
+    // `exactOptionalPropertyTypes` treats an explicit `requires: undefined`
+    // as different from an absent key, so the key must be omitted entirely
+    // rather than assigned `undefined` when the spec didn't set it.
+    ...(spec.requires === undefined ? {} : { requires: spec.requires }),
   };
 }
