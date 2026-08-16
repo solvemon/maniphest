@@ -55,7 +55,8 @@ export type RejectionReason =
   | 'INSUFFICIENT_CREDITS'
   | 'INSUFFICIENT_FUEL'
   | 'NO_DEPOT'
-  | 'NO_ROUTE';
+  | 'NO_ROUTE'
+  | 'NOT_STRANDED';
 
 /**
  * The result of an action that was not applied.
