@@ -71,13 +71,19 @@ export interface RescueAction {
 /**
  * The set of actions a reducer can apply to a {@link State}.
  *
- * `WaitAction`, `JumpAction`, `DockAction`, `UndockAction`, and
- * `RefuelAction` are the actions slice-0 needs. Later issues widen this
+ * `WaitAction`, `JumpAction`, `DockAction`, `UndockAction`, `RefuelAction`,
+ * and `RescueAction` are the actions slice-0 needs. Later issues widen this
  * union as their subsystems land:
  *
  * - M0-07 adds `BuyAction` and `SellAction`.
  */
-export type Action = WaitAction | JumpAction | DockAction | UndockAction | RefuelAction;
+export type Action =
+  | WaitAction
+  | JumpAction
+  | DockAction
+  | UndockAction
+  | RefuelAction
+  | RescueAction;
 
 /**
  * The driver-facing, monomorphic shape every action kind implements.
