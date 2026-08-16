@@ -1,5 +1,6 @@
 import type { ActionSpec, WaitAction } from './actions.ts';
 import { defineAction } from './actions.ts';
+import { refuelSpec } from './fuel.ts';
 import { dockSpec, jumpSpec, undockSpec } from './movement.ts';
 import { reject } from './rejection.ts';
 
@@ -31,7 +32,7 @@ export const ACTIONS: Record<string, ActionSpec> = Object.assign(Object.create(n
   JUMP: jumpSpec,
   DOCK: dockSpec,
   UNDOCK: undockSpec,
-  // Single append point for new action types: M0-04 adds JUMP/DOCK/UNDOCK,
-  // M0-05 adds REFUEL, and M0-07 adds BUY/SELL. Add each as a new entry
-  // here rather than editing the driver in reduce.ts.
+  REFUEL: refuelSpec,
+  // Single append point for new action types: M0-07 adds BUY/SELL. Add each
+  // as a new entry here rather than editing the driver in reduce.ts.
 });

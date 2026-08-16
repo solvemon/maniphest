@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { distanceBetween, HOME_SYSTEM_ID, SYSTEMS, systemById } from './map.ts';
+import { distanceBetween, hasDepot, HOME_SYSTEM_ID, SYSTEMS, systemById } from './map.ts';
 
 test('should hardcode exactly two systems', () => {
     assert.equal(SYSTEMS.length, 2);
@@ -15,6 +15,17 @@ test('should give every system a non-empty id and name', () => {
     }
 });
 
+test('should give every system a boolean hasDepot flag', () => {
+    for (const system of SYSTEMS) {
+        assert.equal(typeof system.hasDepot, 'boolean');
+    }
+});
+
+test('should place a depot at sol and none at vega', () => {
+    assert.equal(hasDepot('sol'), true);
+    assert.equal(hasDepot('vega'), false);
+});
+
 test('should give the two systems distinct ids', () => {
     assert.notEqual(SYSTEMS[0]!.id, SYSTEMS[1]!.id);
 });
@@ -27,6 +38,14 @@ test('should resolve the home system id to a system', () => {
     const system = systemById(HOME_SYSTEM_ID);
     assert.notEqual(system, null);
     assert.equal(system!.id, HOME_SYSTEM_ID);
+});
+
+// M0-06's "towed to the nearest depot" resolution is only unambiguous while
+// the home system is guaranteed to have a depot: pinning that guarantee here
+// means a future map change that moves the depot off the home system fails
+// this test instead of silently breaking the tow destination.
+test('should place a depot at the home system', () => {
+    assert.equal(hasDepot(HOME_SYSTEM_ID), true);
 });
 
 test('should give every ordered pair of distinct systems a positive integer distance', () => {
@@ -72,6 +91,10 @@ test('should give a null distance when the destination system id is unknown', ()
 
 test('should give a null distance when both system ids are unknown', () => {
     assert.equal(distanceBetween('nope', 'nah'), null);
+});
+
+test('should return false from hasDepot for an unknown system id', () => {
+    assert.equal(hasDepot('nope'), false);
 });
 
 test('should resolve unknown and prototype-named system ids to null', () => {

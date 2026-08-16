@@ -1,9 +1,15 @@
 /**
  * A single travelable location on the map.
+ *
+ * `hasDepot` is a slice-0 literal flag hardcoded per system in `SYSTEMS`.
+ * M2-08 replaces it with a derivation from the system id hash, so callers
+ * should go through the `hasDepot()` helper rather than reading this field
+ * directly — that keeps the derivation swap from rippling out to call sites.
  */
 export interface System {
     id: string;
     name: string;
+    hasDepot: boolean;
 }
 
 /**
@@ -12,10 +18,16 @@ export interface System {
  * Hardcoded to exactly two systems for now: `'sol'` and `'vega'`. Later
  * tasks add the home system id, inter-system distances, and lookup helpers
  * derived from this list.
+ *
+ * The depot sits at `sol`, the home system, so the player starts at the
+ * only refuelling point: topping up before departure vs. gambling the
+ * round trip is a real decision from the first move, and M0-06's tow has
+ * an unambiguous destination. This placement is a slice-0 placeholder to
+ * be tuned by M0-12.
  */
 export const SYSTEMS: readonly System[] = [
-    { id: 'sol', name: 'Sol' },
-    { id: 'vega', name: 'Vega' },
+    { id: 'sol', name: 'Sol', hasDepot: true },
+    { id: 'vega', name: 'Vega', hasDepot: false },
 ];
 
 /**
@@ -87,4 +99,17 @@ export function distanceBetween(a: string, b: string): number | null {
 
     const key = [a, b].sort().join('|');
     return DISTANCES[key] ?? null;
+}
+
+/**
+ * Reports whether a system has a fuel depot.
+ *
+ * Returns `false` for an unknown id rather than throwing, matching
+ * `systemById`'s null-return convention so a bad id can never crash the
+ * action loop. Callers should go through this helper rather than reading
+ * `System.hasDepot` directly, since M2-08 replaces that literal flag with a
+ * derivation from the system id hash.
+ */
+export function hasDepot(id: string): boolean {
+    return systemById(id)?.hasDepot ?? false;
 }

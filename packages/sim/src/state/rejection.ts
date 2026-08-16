@@ -13,19 +13,36 @@
  *   attempted while already docked - both require the ship to be in open
  *   space first.
  * - `NOT_DOCKED` is the posture failure for an action that requires being
- *   docked. Nothing in this issue emits it yet; it is the reason M0-07's
- *   trading gate will use to reject trading while in space.
+ *   docked. M0-04 reserved it with no caller; `REFUEL` is now its first real
+ *   emitter, rejecting a refuel attempted while in open space.
  * - `SAME_SYSTEM` rejects a `JUMP` whose destination is the system the ship
  *   is already in.
  * - `UNKNOWN_SYSTEM` rejects a `JUMP` whose destination does not exist in
  *   the system map.
  *
- * Later issues extend it with more specific reasons as their subsystems
- * land:
+ * M0-05 adds the fuel and refuelling reasons:
  *
- * - M0-05 adds `INSUFFICIENT_FUEL` and `NO_DEPOT`.
- * - M0-07 adds `INSUFFICIENT_CREDITS`, `INSUFFICIENT_CARGO_SPACE`, and
- *   `INSUFFICIENT_STOCK`.
+ * - `INSUFFICIENT_FUEL` rejects a `JUMP` where `vessel.fuel` is less than
+ *   `fuelCostOf(...)` for the route. Rejected outright rather than clamped
+ *   to whatever fuel remains: a half-jump is not a thing.
+ * - `NO_DEPOT` rejects a `REFUEL` at a system whose `hasDepot()` is `false`.
+ * - `FUEL_CAPACITY_EXCEEDED` rejects a `REFUEL` whose `units` would push
+ *   `fuel` past `fuelCapacity`. All-or-nothing rather than clamping to the
+ *   remaining headroom, matching `INSUFFICIENT_FUEL`'s no-partial-effect
+ *   stance; only strictly exceeding capacity is rejected, so a refuel that
+ *   lands exactly on `fuelCapacity` succeeds.
+ * - `NO_ROUTE` rejects a `JUMP` where `fuelCostOf` returned `null` for a
+ *   destination that does exist in the map. Not yet reachable through
+ *   `reduce` in the current two-system map, since its one system pair
+ *   always has a distance - but it is a live `fuelCostOf` result, directly
+ *   unit-testable today, and becomes reachable through `reduce` the moment
+ *   M2's sparse map lands. Not untested dead code.
+ * - `INSUFFICIENT_CREDITS` rejects a `REFUEL` where `credits` is less than
+ *   `units * FUEL_PRICE_PER_UNIT`. Pulled forward from M0-07's roadmap
+ *   because `REFUEL` needs a credits check now, not just trading.
+ *
+ * M0-07 still extends it further with `INSUFFICIENT_CARGO_SPACE` and
+ * `INSUFFICIENT_STOCK`.
  */
 export type RejectionReason =
   | 'MALFORMED_ACTION'
@@ -33,7 +50,12 @@ export type RejectionReason =
   | 'NOT_DOCKED'
   | 'NOT_IN_SPACE'
   | 'SAME_SYSTEM'
-  | 'UNKNOWN_SYSTEM';
+  | 'UNKNOWN_SYSTEM'
+  | 'FUEL_CAPACITY_EXCEEDED'
+  | 'INSUFFICIENT_CREDITS'
+  | 'INSUFFICIENT_FUEL'
+  | 'NO_DEPOT'
+  | 'NO_ROUTE';
 
 /**
  * The result of an action that was not applied.
