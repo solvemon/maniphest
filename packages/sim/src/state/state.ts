@@ -21,9 +21,28 @@ import type { RejectionReason } from './rejection.ts';
 export const STATE_VERSION = 1;
 
 /**
- * Slice-0 placeholder starting fuel. Tuned for real balance in M0-05.
+ * 10 fuel is exactly one `sol`↔`vega` jump (cost
+ * `ceil(10 * FUEL_PER_DISTANCE / fuelEfficiency)` = 10), against a capacity
+ * of 20. That makes the opening decision of every run a real one - top the
+ * tank up before leaving, or gamble the round trip and strand at `vega`.
+ * Still a slice-0 placeholder, to be tuned by M0-12's balance report.
  */
-const INITIAL_FUEL = 100;
+const INITIAL_FUEL = 10;
+
+/**
+ * Two `sol`↔`vega` jumps on a full tank - exactly one round trip. Chosen
+ * over a bigger tank so that a full top-up is a felt expense (250 of 1000
+ * starting credits) rather than a formality. Slice-0 placeholder, tuned by
+ * M0-12.
+ */
+const INITIAL_FUEL_CAPACITY = 20;
+
+/**
+ * The baseline hull's divisor in DESIGN.md §8's cost formula, so
+ * `sol`↔`vega` costs `ceil(10 * 1 / 1)` = 10 fuel. Kept at `1` so M1's
+ * vessel classes only need to change the number, not the formula.
+ */
+const INITIAL_FUEL_EFFICIENCY = 1;
 
 /**
  * Slice-0 placeholder starting hull integrity. Tuned once damage/repair
@@ -60,6 +79,24 @@ export interface Vessel {
    * this value. Never optional — see the {@link State} doc comment for why.
    */
   hull: number;
+  /**
+   * The hard ceiling on `fuel`. `REFUEL` is refused whole — never partially
+   * filled — when the requested amount would push `fuel` above this value,
+   * rather than silently clamping to the ceiling: a partial fill would mean
+   * the actor's requested amount and the amount actually applied diverge,
+   * which turns "refuel by X" into a lie the caller has to detect after the
+   * fact instead of a request the reducer can reject outright up front.
+   */
+  fuelCapacity: number;
+  /**
+   * The divisor in DESIGN.md §8's travel cost formula,
+   * `distance * fuelPerUnit / efficiency`. `1` is the baseline hull; values
+   * above `1` make travel cheaper. Kept as a per-vessel number rather than
+   * folded into the formula or a shared constant so M1's vessel classes can
+   * differentiate travel cost by changing only this field, with the cost
+   * formula itself untouched.
+   */
+  fuelEfficiency: number;
   cargoCapacity: number;
   cargo: Record<string, number>;
 }
@@ -132,6 +169,8 @@ export function initialState(worldSeed: number): State {
     vessel: {
       fuel: INITIAL_FUEL,
       hull: INITIAL_HULL,
+      fuelCapacity: INITIAL_FUEL_CAPACITY,
+      fuelEfficiency: INITIAL_FUEL_EFFICIENCY,
       cargoCapacity: INITIAL_CARGO_CAPACITY,
       cargo: {},
     },

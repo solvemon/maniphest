@@ -33,16 +33,32 @@ export interface UndockAction {
 }
 
 /**
+ * Buys `units` of fuel at the docked station, at whatever price the market
+ * quotes.
+ *
+ * `units` is an explicit, all-or-nothing amount — never clamped. A
+ * zero-argument "fill to capacity" form would leave a poor player unable to
+ * buy the fuel they *can* afford, and would stop M0-12's `cautious` policy
+ * from holding a reserve rather than always topping off. A clamped "buy as
+ * much as fits and affords" form would silently hide a failed intent from
+ * the caller, against the reject-don't-clamp rule. `units` must be a safe
+ * integer `>= 1`; anything else is `INVALID_ARGUMENT` at parse time.
+ */
+export interface RefuelAction {
+  type: 'REFUEL';
+  units: number;
+}
+
+/**
  * The set of actions a reducer can apply to a {@link State}.
  *
- * `WaitAction`, `JumpAction`, `DockAction`, and `UndockAction` are the
- * actions slice-0 needs. Later issues widen this union as their subsystems
- * land:
+ * `WaitAction`, `JumpAction`, `DockAction`, `UndockAction`, and
+ * `RefuelAction` are the actions slice-0 needs. Later issues widen this
+ * union as their subsystems land:
  *
- * - M0-05 adds `RefuelAction`.
  * - M0-07 adds `BuyAction` and `SellAction`.
  */
-export type Action = WaitAction | JumpAction | DockAction | UndockAction;
+export type Action = WaitAction | JumpAction | DockAction | UndockAction | RefuelAction;
 
 /**
  * The driver-facing, monomorphic shape every action kind implements.

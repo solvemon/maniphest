@@ -289,6 +289,7 @@ const SAMPLE_ACTIONS: Record<string, { state: State; action: unknown }> = {
     JUMP: { state: UNDOCKED_AT_SOL, action: { type: 'JUMP', systemId: 'vega' } },
     DOCK: { state: UNDOCKED_AT_SOL, action: { type: 'DOCK' } },
     UNDOCK: { state: initialState(SEED), action: { type: 'UNDOCK' } },
+    REFUEL: { state: initialState(SEED), action: { type: 'REFUEL', units: 1 } },
 };
 
 test('should have durationOf return null for unknown or malformed actions', () => {

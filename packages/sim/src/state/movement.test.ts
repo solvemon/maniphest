@@ -10,6 +10,7 @@ import { ACTIONS } from './registry.ts';
 import { defineAction } from './actions.ts';
 import { reject } from './rejection.ts';
 import { findUndefined } from './test-helpers.ts';
+import { fuelCostOf, FUEL_PER_DISTANCE } from './fuel.ts';
 
 /**
  * Shared fixtures and helpers for `movement.test.ts`. Kept at the top of the
@@ -20,6 +21,25 @@ const SEED = 909090;
 
 /** Ticks a `JUMP` from `'sol'` to `'vega'` costs: distance 10 * 2 ticks/unit = 20. */
 const SOL_TO_VEGA_JUMP_TICKS = (distanceBetween('sol', 'vega') ?? 0) * JUMP_TICKS_PER_DISTANCE;
+
+/**
+ * Builds an in-space state at `'sol'` (the `UNDOCK`ed `initialState(SEED)`)
+ * with `vessel.fuel` overridden to `fuel`, everything else left exactly as
+ * `reduce(initialState(SEED), { type: 'UNDOCK' })` produced it.
+ *
+ * That "everything else identical" part is load-bearing, not incidental:
+ * `assertRejected` (below) proves a rejection by comparing `next` and `prev`
+ * serialized whole, with only `lastRejection` excluded - so a fixture built
+ * from this helper must differ from the plain undocked state in `vessel.fuel`
+ * alone. Any other divergence (a different `tick`, a mutated `rng`, a
+ * reordered `cargo` object, ...) would make that whole-state comparison
+ * spuriously pass or fail for reasons that have nothing to do with the fuel
+ * value under test.
+ */
+function inSpaceWithFuel(fuel: number): State {
+    const state = reduce(initialState(SEED), { type: 'UNDOCK' });
+    return { ...state, vessel: { ...state.vessel, fuel } };
+}
 
 /**
  * Asserts that `reduce(prev, action)` takes the rejection path with
@@ -146,6 +166,48 @@ test('should reject JUMP with INVALID_ARGUMENT when systemId is an empty string'
     assertRejectedMalformed(undocked, { type: 'JUMP', systemId: '' }, 'INVALID_ARGUMENT');
 });
 
+test('should reject JUMP with INSUFFICIENT_FUEL when fuel is one unit short', () => {
+    // Acceptance criterion #1: an underfuelled JUMP is rejected outright,
+    // never silently clamped to whatever fuel remains - `assertRejected`'s
+    // whole-state comparison below proves the fuel was neither clamped nor
+    // partially spent.
+    const base = reduce(initialState(SEED), { type: 'UNDOCK' });
+    const cost = fuelCostOf(base, 'vega')!;
+    const state = inSpaceWithFuel(cost - 1);
+
+    assertRejected(state, { type: 'JUMP', systemId: 'vega' }, 'INSUFFICIENT_FUEL');
+});
+
+test('should allow a JUMP that drains fuel to exactly zero', () => {
+    // This exact-drain path is exactly what makes stranding reachable from
+    // legal play: a JUMP whose cost equals the ship's remaining fuel must
+    // succeed and land the ship at 0 fuel, not be rejected as
+    // INSUFFICIENT_FUEL by an off-by-one - if the gate were `<=` instead of
+    // `<`, a player could never legally reach zero fuel and stranding
+    // detection would have nothing to detect.
+    const base = reduce(initialState(SEED), { type: 'UNDOCK' });
+    const cost = fuelCostOf(base, 'vega')!;
+    const state = inSpaceWithFuel(cost);
+
+    const jumped = reduce(state, { type: 'JUMP', systemId: 'vega' });
+
+    assert.equal(jumped.lastRejection, null);
+    assert.equal(jumped.player.systemId, 'vega');
+    assert.equal(jumped.player.docked, false);
+    assert.equal(jumped.vessel.fuel, 0);
+});
+
+test('should reject a zero-fuel JUMP to the current system with SAME_SYSTEM, not INSUFFICIENT_FUEL', () => {
+    // Pins the documented check order: identity and existence are checked
+    // before resources. Both conditions apply here - the ship has no fuel
+    // and the destination is where it already is - so this proves
+    // SAME_SYSTEM wins, because a resource shortfall is only meaningful to
+    // report about a destination that is real and reachable.
+    const state = inSpaceWithFuel(0);
+
+    assertRejected(state, { type: 'JUMP', systemId: 'sol' }, 'SAME_SYSTEM');
+});
+
 test('should reject JUMP with NOT_IN_SPACE for an unknown destination while docked (gate precedes apply)', () => {
     const start = initialState(SEED);
 
@@ -207,6 +269,22 @@ test('should derive each action\'s tick delta from the map/movement constants, n
     const docked = reduce(jumped, { type: 'DOCK' });
 
     assert.equal(docked.tick - jumped.tick, DOCKING_TICKS);
+});
+
+test('should deduct exactly fuelCostOf on a successful JUMP, derived from the constants', () => {
+    // Same precedent as the tick-delta test above: pins the fuel *formula*,
+    // not a magic number, so a balance retune in M0-12 (which will tune
+    // FUEL_PER_DISTANCE and/or the vessel's fuelEfficiency) can't silently
+    // break this test by only matching a hardcoded literal.
+    const before = reduce(initialState(SEED), { type: 'UNDOCK' });
+
+    const after = reduce(before, { type: 'JUMP', systemId: 'vega' });
+    const expectedCost = Math.ceil(
+        (distanceBetween('sol', 'vega')! * FUEL_PER_DISTANCE) / before.vessel.fuelEfficiency,
+    );
+
+    assert.equal(fuelCostOf(before, 'vega'), expectedCost);
+    assert.equal(before.vessel.fuel - after.vessel.fuel, fuelCostOf(before, 'vega'));
 });
 
 test('should reject a docked-only action with NOT_DOCKED when undocked (M0-07 gate proof)', () => {
@@ -281,6 +359,22 @@ test('should preview a malformed JUMP (non-string systemId) as null', () => {
     const undocked = reduce(start, { type: 'UNDOCK' });
 
     assert.equal(durationOf(undocked, { type: 'JUMP', systemId: 42 }), null);
+});
+
+test('should still preview an unaffordable JUMP as its tick cost, not null', () => {
+    // Pins the same deliberate non-mirroring documented on `durationOf` in
+    // reduce.ts: semantic rejections a handler's own `apply` would raise -
+    // `SAME_SYSTEM`, `UNKNOWN_SYSTEM`, and (from this issue) INSUFFICIENT_FUEL
+    // - are never reproduced inside the preview path. Mirroring
+    // INSUFFICIENT_FUEL into `durationOf` would mean duplicating the fuel
+    // handler's own `apply` logic there, and `reduce` must remain the sole
+    // authority on legality: fuel is no different from SAME_SYSTEM in that
+    // respect. A zero-fuel ship still gets an honest tick-cost preview for a
+    // JUMP it cannot actually afford; only dispatching through `reduce` and
+    // inspecting `lastRejection` reveals it would be rejected.
+    const state = inSpaceWithFuel(0);
+
+    assert.equal(durationOf(state, { type: 'JUMP', systemId: 'vega' }), SOL_TO_VEGA_JUMP_TICKS);
 });
 
 test('should strip a stray property from an accepted DOCK action before it reaches state', () => {

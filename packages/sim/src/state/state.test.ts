@@ -100,7 +100,9 @@ test('should tag initialState(SEED) with the current STATE_VERSION', () => {
 test('should populate initialState(SEED) with the Slice-0 placeholder values', () => {
     const s = initialState(SEED);
 
-    assert.equal(s.vessel.fuel, 100);
+    assert.equal(s.vessel.fuel, 10);
+    assert.equal(s.vessel.fuelCapacity, 20);
+    assert.equal(s.vessel.fuelEfficiency, 1);
     assert.equal(s.vessel.hull, 100);
     assert.equal(s.vessel.cargoCapacity, 50);
     assert.equal(s.credits, 1000);
