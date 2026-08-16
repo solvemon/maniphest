@@ -50,6 +50,25 @@ export interface RefuelAction {
 }
 
 /**
+ * Tows a stranded player to the nearest depot, per DESIGN.md §8's rescue
+ * resolution.
+ *
+ * The tow forfeits all cargo and `RESCUE_CREDIT_SHARE` of credits — the
+ * "costly rescue" that keeps a bad run's real cost a forced journey home
+ * rather than a number on a ledger. Hull damage is left untouched: DESIGN.md
+ * §8 is explicit that a tow does not double as a repair, since hull can only
+ * be fully repaired in core systems.
+ *
+ * Takes no arguments: there is nothing for a caller to specify beyond "tow
+ * me," so `parse` rebuilds `{ type: 'RESCUE' }` from nothing rather than
+ * reading anything off `raw` — mirroring `dockSpec`/`undockSpec`'s idiom in
+ * `movement.ts` for other zero-argument actions.
+ */
+export interface RescueAction {
+  type: 'RESCUE';
+}
+
+/**
  * The set of actions a reducer can apply to a {@link State}.
  *
  * `WaitAction`, `JumpAction`, `DockAction`, `UndockAction`, and
