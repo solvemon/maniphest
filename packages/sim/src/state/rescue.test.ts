@@ -164,3 +164,18 @@ test('should tow a stranded player to a depot with enough fuel for a jump, docke
     assert.ok(after.vessel.fuel <= after.vessel.fuelCapacity);
     assert.equal(after.player.docked, true);
 });
+
+test('should leave hull damage untouched by a tow', () => {
+    // AC #4: a tow fixes fuel and position, never hull - `apply` spreads
+    // `state.vessel` first (`{ ...state.vessel, cargo: {}, fuel }`), so hull
+    // passes through by construction with no line in rescue.ts ever naming
+    // it. Starting from a damaged hull, the post-rescue hull must come out
+    // exactly as damaged - no repair, and no extra damage from the tow itself.
+    const before = stateAt({ systemId: 'vega', fuel: 0, hull: 37 });
+    assert.equal(isStranded(before), true);
+
+    const after = reduce(before, { type: 'RESCUE' });
+
+    assert.equal(after.lastRejection, null);
+    assert.equal(after.vessel.hull, 37);
+});
