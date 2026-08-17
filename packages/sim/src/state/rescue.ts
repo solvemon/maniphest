@@ -79,10 +79,11 @@ export function nearestDepot(state: State): string | null {
   return nearestId;
 }
 
-// TODO(M0-06 task 10/11/12): `duration` and `apply` are placeholders until
-// those tasks land — `duration` previews zero ticks and `apply` is a no-op.
+// TODO(M0-06 task 11/12): `apply` is a placeholder until those tasks land —
+// it is currently a no-op.
 export const rescueSpec = defineAction<RescueAction>({
   parse: () => ({ type: 'RESCUE' }),
-  duration: () => 0,
+  duration: (state) =>
+    (distanceBetween(state.player.systemId, nearestDepot(state) ?? '') ?? 0) * JUMP_TICKS_PER_DISTANCE,
   apply: (state) => state,
 });
