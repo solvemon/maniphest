@@ -78,3 +78,11 @@ export function nearestDepot(state: State): string | null {
 
   return nearestId;
 }
+
+// TODO(M0-06 task 10/11/12): `duration` and `apply` are placeholders until
+// those tasks land — `duration` previews zero ticks and `apply` is a no-op.
+export const rescueSpec = defineAction<RescueAction>({
+  parse: () => ({ type: 'RESCUE' }),
+  duration: () => 0,
+  apply: (state) => state,
+});
