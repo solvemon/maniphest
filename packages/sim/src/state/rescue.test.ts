@@ -120,3 +120,20 @@ test('should empty cargo and take its credit share on a tow', () => {
     assert.deepStrictEqual(after.vessel.cargo, {});
     assert.equal(after.credits, before.credits - Math.ceil(before.credits * RESCUE_CREDIT_SHARE));
 });
+
+test('should give the post-tow cargo a fresh object identity, never aliased', () => {
+    // AC #1b: rescue.ts's doc comment on `apply` promises a fresh `{}`
+    // literal on every call, never a shared module-level constant - two
+    // rescues (or a rescue and a fresh run) must never end up with
+    // `Vessel.cargo` objects that are the same reference, or a mutation via
+    // one player's state would silently leak into the other's. `deepStrictEqual`
+    // alone (as in the test above) cannot catch that: two aliased `{}`
+    // references are just as deep-equal as two independent ones.
+    const before = stateAt({ systemId: 'vega', fuel: 0, cargo: { ore: 5 } });
+    const after = reduce(before, { type: 'RESCUE' });
+    assert.notStrictEqual(after.vessel.cargo, before.vessel.cargo);
+
+    const otherBefore = stateAt({ systemId: 'vega', fuel: 0, cargo: { water: 3 } });
+    const otherAfter = reduce(otherBefore, { type: 'RESCUE' });
+    assert.notStrictEqual(after.vessel.cargo, otherAfter.vessel.cargo);
+});
