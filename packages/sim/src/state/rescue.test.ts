@@ -346,3 +346,29 @@ test('should reject RESCUE with NOT_STRANDED for the broke-at-a-depot boundary',
 
     assertRejected(before, { type: 'RESCUE' }, 'NOT_STRANDED');
 });
+
+test('should tow a stranded player home the same way whether docked or adrift', () => {
+    // `isStranded` is deliberately posture-blind (see fuel.ts's doc comment
+    // on `isStranded`), and `rescueSpec` enforces no `requires` posture of
+    // its own - a tow must be callable, and resolve identically, from either
+    // side of `DOCK`/`UNDOCK`. Running the same stranding at `vega` once
+    // docked and once adrift and comparing the two post-tow states whole
+    // proves the only input difference (pre-tow posture) is overwritten by
+    // the tow itself: both must land docked at `sol` with byte-for-byte
+    // identical results.
+    const dockedBefore = stateAt({ systemId: 'vega', docked: true, fuel: 0 });
+    const adriftBefore = stateAt({ systemId: 'vega', docked: false, fuel: 0 });
+    assert.equal(isStranded(dockedBefore), true);
+    assert.equal(isStranded(adriftBefore), true);
+
+    const dockedAfter = reduce(dockedBefore, { type: 'RESCUE' });
+    const adriftAfter = reduce(adriftBefore, { type: 'RESCUE' });
+
+    assert.equal(dockedAfter.lastRejection, null);
+    assert.equal(adriftAfter.lastRejection, null);
+    assert.equal(dockedAfter.player.systemId, 'sol');
+    assert.equal(dockedAfter.player.docked, true);
+    assert.equal(adriftAfter.player.systemId, 'sol');
+    assert.equal(adriftAfter.player.docked, true);
+    assert.deepStrictEqual(dockedAfter, adriftAfter);
+});
