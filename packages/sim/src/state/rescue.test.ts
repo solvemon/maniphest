@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState } from './state.ts';
 import type { State } from './state.ts';
+import { reduce } from './reduce.ts';
+import { isStranded } from './fuel.ts';
 
 /**
  * Shared fixtures and helpers for `rescue.test.ts`. Kept at the top of the
@@ -71,4 +73,32 @@ test('should build test states that differ from initialState only in the intende
     // against its own `stateAt`, pinning the "spread, never a hand-written
     // literal" contract this helper's doc comment promises.
     assert.deepStrictEqual(stateAt(), initialState(SEED));
+});
+
+test('should accept a RESCUE after stranding is reached through legal play', () => {
+    // AC #4 for RESCUE itself: a tow must be reachable through legal play,
+    // not just constructible by hand - the same proof `fuel.test.ts`'s
+    // "should reach stranding from a legal action sequence" runs for
+    // `isStranded` alone, carried one step further into `RESCUE`. Starting
+    // fuel (10) is exactly the sol-to-vega jump's cost, so `UNDOCK` (free)
+    // followed by a `JUMP` to `vega` - a depot-less system - spends the tank
+    // to 0 in two ordinary moves and leaves the player genuinely stranded.
+    let s = initialState(SEED);
+    assert.equal(isStranded(s), false);
+
+    s = reduce(s, { type: 'UNDOCK' });
+    assert.equal(s.lastRejection, null);
+
+    s = reduce(s, { type: 'JUMP', systemId: 'vega' });
+    assert.equal(s.lastRejection, null);
+    assert.equal(s.vessel.fuel, 0);
+    assert.equal(isStranded(s), true);
+
+    s = reduce(s, { type: 'RESCUE' });
+
+    // `lastRejection === null` proves the tow was actually applied, not
+    // rejected as `NOT_STRANDED` or `NO_DEPOT` - the player genuinely is
+    // stranded, and `sol` (the only depot on the slice-0 map) is reachable
+    // as a rescue destination.
+    assert.equal(s.lastRejection, null);
 });
