@@ -91,9 +91,25 @@ export const rescueSpec = defineAction<RescueAction>({
     if (destination === null) {
       return reject('NO_DEPOT');
     }
-    // TODO(M0-06 task 12): tow the player to `destination`, charging
-    // `RESCUE_CREDIT_SHARE` of their credits. Returning `state` unchanged is
-    // a placeholder until that task lands.
-    return state;
+
+    const relocated = { ...state, player: { systemId: destination, docked: true } };
+    const minJumpCost = SYSTEMS.filter((s) => s.id !== destination).reduce<number | null>((min, s) => {
+      const cost = fuelCostOf(relocated, s.id);
+      if (cost === null) {
+        return min;
+      }
+      return min === null ? cost : Math.min(min, cost);
+    }, null);
+    const fuel =
+      minJumpCost === null
+        ? state.vessel.fuel
+        : Math.min(state.vessel.fuelCapacity, Math.max(state.vessel.fuel, minJumpCost));
+
+    return {
+      ...state,
+      player: { systemId: destination, docked: true },
+      vessel: { ...state.vessel, cargo: {}, fuel },
+      credits: Math.max(0, state.credits - Math.ceil(state.credits * RESCUE_CREDIT_SHARE)),
+    };
   },
 });
