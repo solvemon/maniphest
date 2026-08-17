@@ -122,6 +122,27 @@ test('should empty cargo and take its credit share on a tow', () => {
     assert.equal(after.credits, before.credits - Math.ceil(before.credits * RESCUE_CREDIT_SHARE));
 });
 
+test('should floor the credit deduction so a tow never drives credits negative', () => {
+    // AC #2: the credit fee is clamped at 0, and `Math.ceil` rounds the
+    // deduction against the player rather than in their favor. At `credits:
+    // 0`, `Math.ceil(0 * RESCUE_CREDIT_SHARE)` is `0`, so the floor is a no-op
+    // and the balance stays `0`. At `credits: 3`, `Math.ceil(3 * 0.25)` is
+    // `Math.ceil(0.75)`, which rounds up to `1` rather than down to `0` - the
+    // player loses `1` credit, not a fractional amount - leaving a balance of
+    // `2`, never `3` and never negative.
+    const zero = stateAt({ systemId: 'vega', fuel: 0, credits: 0 });
+    const afterZero = reduce(zero, { type: 'RESCUE' });
+    assert.equal(afterZero.lastRejection, null);
+    assert.equal(afterZero.credits, 0);
+    assert.ok(afterZero.credits >= 0);
+
+    const low = stateAt({ systemId: 'vega', fuel: 0, credits: 3 });
+    const afterLow = reduce(low, { type: 'RESCUE' });
+    assert.equal(afterLow.lastRejection, null);
+    assert.equal(afterLow.credits, 2);
+    assert.ok(afterLow.credits >= 0);
+});
+
 test('should give the post-tow cargo a fresh object identity, never aliased', () => {
     // AC #1b: rescue.ts's doc comment on `apply` promises a fresh `{}`
     // literal on every call, never a shared module-level constant - two
