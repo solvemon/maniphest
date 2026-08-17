@@ -284,12 +284,24 @@ test('should compute duration from the pre-action state, not the post-apply stat
  */
 const UNDOCKED_AT_SOL = reduce(initialState(SEED), { type: 'UNDOCK' });
 
+/**
+ * A player marooned at `vega` with no fuel left for the return jump to
+ * `sol` - the only depot on the slice-0 map - so `isStranded` reads `true`
+ * and `RESCUE` has a tow to grant instead of rejecting `NOT_STRANDED`.
+ */
+const STRANDED_AT_VEGA: State = {
+    ...initialState(SEED),
+    player: { systemId: 'vega', docked: false },
+    vessel: { ...initialState(SEED).vessel, fuel: 0 },
+};
+
 const SAMPLE_ACTIONS: Record<string, { state: State; action: unknown }> = {
     WAIT: { state: initialState(SEED), action: { type: 'WAIT', n: 4 } },
     JUMP: { state: UNDOCKED_AT_SOL, action: { type: 'JUMP', systemId: 'vega' } },
     DOCK: { state: UNDOCKED_AT_SOL, action: { type: 'DOCK' } },
     UNDOCK: { state: initialState(SEED), action: { type: 'UNDOCK' } },
     REFUEL: { state: initialState(SEED), action: { type: 'REFUEL', units: 1 } },
+    RESCUE: { state: STRANDED_AT_VEGA, action: { type: 'RESCUE' } },
 };
 
 test('should have durationOf return null for unknown or malformed actions', () => {
