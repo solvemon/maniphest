@@ -19,3 +19,14 @@ import { fuelCostOf, isStranded } from './fuel.ts';
 import { JUMP_TICKS_PER_DISTANCE } from './movement.ts';
 import { reject } from './rejection.ts';
 import type { State } from './state.ts';
+
+/**
+ * Fraction of the player's credits the tow takes as its fee.
+ *
+ * At `0.25`, a rescue is a felt setback without wiping out the player
+ * outright. This is a placeholder value only, to be tuned by M0-12's balance
+ * report once real playtesting data exists — see DESIGN.md §14's tracked
+ * risk that a percentage haircut stings early and decays in severity as
+ * wealth grows.
+ */
+export const RESCUE_CREDIT_SHARE = 0.25;
