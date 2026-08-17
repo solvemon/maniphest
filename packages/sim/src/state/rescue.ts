@@ -31,6 +31,31 @@ import type { State } from './state.ts';
  */
 export const RESCUE_CREDIT_SHARE = 0.25;
 
+/**
+ * Finds the id of the depot system nearest to the player's current system,
+ * or `null` if none is reachable.
+ *
+ * This is the single authority on the tow's destination: `RESCUE`'s
+ * `duration` and `apply` both consult it rather than re-deriving the answer,
+ * so the two can never disagree about where the tow ends up — the same
+ * pattern `fuelCostOf` establishes for jump cost in `fuel.ts`.
+ *
+ * Depot status is checked through the `hasDepot()` helper rather than
+ * reading `System.hasDepot` directly, since M2-08 replaces that literal flag
+ * with a hash-based derivation; going through the helper is what keeps that
+ * swap from rippling out to this function.
+ *
+ * A `null` distance from `distanceBetween` — an unknown system id, or a known
+ * system with no recorded lane to it — removes that system from
+ * consideration rather than being treated as a zero-cost route: "no route"
+ * is not a free route, the same stance `fuelCostOf` and `isStranded` take on
+ * the same `null` in `fuel.ts`.
+ *
+ * Ties are resolved by `SYSTEMS`' array order — the first depot found at the
+ * minimum distance wins, since a strict `<` comparison never displaces an
+ * earlier candidate for an equal one — so the result is fully deterministic
+ * for a given `state`, with no `eventRng` draw involved.
+ */
 export function nearestDepot(state: State): string | null {
   let nearestId: string | null = null;
   let nearestDistance = Infinity;
