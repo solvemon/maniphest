@@ -272,3 +272,19 @@ test('should advance the clock at jump speed for the distance towed', () => {
     assert.equal(after.tick, before.tick + duration);
     assert.equal(duration, distance * JUMP_TICKS_PER_DISTANCE);
 });
+
+test('should draw no randomness on a tow', () => {
+    // Determinism: `rescueSpec.apply` never reads or advances `state.rng` -
+    // every field it touches (`player`, `vessel.cargo`, `vessel.fuel`,
+    // `credits`) is derived from `nearestDepot`, `fuelCostOf`, and arithmetic
+    // on existing state, with no `eventRng` draw anywhere in rescue.ts. A tow
+    // must therefore leave `rng` byte-for-byte identical to what it was
+    // before, the same guarantee `fuel.test.ts` pins for jumps and refuels.
+    const before = stateAt({ systemId: 'vega', fuel: 0 });
+    assert.equal(isStranded(before), true);
+
+    const after = reduce(before, { type: 'RESCUE' });
+
+    assert.equal(after.lastRejection, null);
+    assert.deepStrictEqual(after.rng, before.rng);
+});
