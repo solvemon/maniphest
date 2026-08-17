@@ -2,10 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState } from './state.ts';
 import type { State } from './state.ts';
-import { reduce } from './reduce.ts';
+import { durationOf, reduce } from './reduce.ts';
 import { fuelCostOf, isStranded } from './fuel.ts';
-import { hasDepot, SYSTEMS } from '../map/index.ts';
-import { RESCUE_CREDIT_SHARE } from './rescue.ts';
+import { distanceBetween, hasDepot, SYSTEMS } from '../map/index.ts';
+import { JUMP_TICKS_PER_DISTANCE } from './movement.ts';
+import { nearestDepot, RESCUE_CREDIT_SHARE } from './rescue.ts';
 
 /**
  * Shared fixtures and helpers for `rescue.test.ts`. Kept at the top of the
@@ -243,4 +244,31 @@ test('should never leave a tow with less fuel than the tank already held', () =>
 
     assert.equal(after.lastRejection, null);
     assert.equal(after.vessel.fuel, before.vessel.fuel);
+});
+
+test('should advance the clock at jump speed for the distance towed', () => {
+    // `rescueSpec.duration` reuses `JUMP_TICKS_PER_DISTANCE`, the same rate an
+    // ordinary `JUMP` uses (see rescue.ts's doc comment on `duration`) - a tow
+    // is priced in ticks exactly like a jump over the same distance would be.
+    // Pinning `post.tick` against both `durationOf` and the raw
+    // `distanceBetween * JUMP_TICKS_PER_DISTANCE` formula ties the driver's
+    // clock advance, the preview API, and the underlying rate together so
+    // none of the three can silently drift out of step with the others.
+    const origin = 'vega';
+    const before = stateAt({ systemId: origin, fuel: 0 });
+    assert.equal(isStranded(before), true);
+
+    const destination = nearestDepot(before);
+    assert.ok(destination !== null);
+
+    const distance = distanceBetween(origin, destination);
+    assert.ok(distance !== null);
+
+    const duration = durationOf(before, { type: 'RESCUE' });
+    assert.ok(duration !== null);
+    const after = reduce(before, { type: 'RESCUE' });
+
+    assert.equal(after.lastRejection, null);
+    assert.equal(after.tick, before.tick + duration);
+    assert.equal(duration, distance * JUMP_TICKS_PER_DISTANCE);
 });
