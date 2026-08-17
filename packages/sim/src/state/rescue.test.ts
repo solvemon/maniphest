@@ -372,3 +372,41 @@ test('should tow a stranded player home the same way whether docked or adrift', 
     assert.equal(adriftAfter.player.docked, true);
     assert.deepStrictEqual(dockedAfter, adriftAfter);
 });
+
+test('should return sol as the nearest depot from vega', () => {
+    // `sol` is the slice-0 map's only depot (`hasDepot: true` in map.ts's
+    // `SYSTEMS`), so it is trivially the nearest one reachable from `vega` -
+    // the only other system - regardless of stranding: `nearestDepot` never
+    // consults `isStranded`, only `distanceBetween` and `hasDepot`.
+    const state = stateAt({ systemId: 'vega' });
+
+    assert.equal(nearestDepot(state), 'sol');
+});
+
+test('should return the current system id when already at the depot', () => {
+    // `distanceBetween(a, a)` returns `0` (see map.ts's doc comment: same-id
+    // pairs short-circuit to `0` without consulting `DISTANCES`), not `null` -
+    // so a player already standing at `sol` measures a `0` distance to `sol`
+    // itself, which beats every other candidate's distance and wins the loop.
+    // Since `sol` is the only depot on the slice-0 map, "the current system"
+    // and "the nearest depot" happen to be the same id here either way, but
+    // it is this `0`-not-`null` self-distance, not the single-depot map
+    // shape, that this test pins.
+    const state = stateAt({ systemId: 'sol' });
+
+    assert.equal(nearestDepot(state), 'sol');
+});
+
+test('should return null when every distance from the player is unrouted', () => {
+    // Exercises the `null`-distance discard path directly: `distanceBetween`
+    // returns `null` whenever either id fails `systemById`, so a state whose
+    // `player.systemId` is not a real system id makes every candidate in the
+    // `SYSTEMS` loop measure `null` - never a `0` or a finite number - and
+    // the `if (distance === null) continue;` branch discards each one in
+    // turn. With no candidate ever assigned to `nearestId`, the loop finishes
+    // still holding its initial `null`, so `nearestDepot` reports "no depot
+    // reachable" rather than mistaking "no route" for a free, zero-cost one.
+    const state = stateAt({ systemId: 'nowhere' });
+
+    assert.equal(nearestDepot(state), null);
+});
