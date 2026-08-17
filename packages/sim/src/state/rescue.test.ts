@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialState } from './state.ts';
+import { initialState, STATE_VERSION } from './state.ts';
 import type { State } from './state.ts';
 import { durationOf, reduce } from './reduce.ts';
 import { fuelCostOf, isStranded } from './fuel.ts';
@@ -8,6 +8,7 @@ import { distanceBetween, hasDepot, SYSTEMS } from '../map/index.ts';
 import { JUMP_TICKS_PER_DISTANCE } from './movement.ts';
 import { nearestDepot, RESCUE_CREDIT_SHARE } from './rescue.ts';
 import type { RejectionReason } from './rejection.ts';
+import { findUndefined } from './test-helpers.ts';
 
 /**
  * Shared fixtures and helpers for `rescue.test.ts`. Kept at the top of the
@@ -409,4 +410,23 @@ test('should return null when every distance from the player is unrouted', () =>
     const state = stateAt({ systemId: 'nowhere' });
 
     assert.equal(nearestDepot(state), null);
+});
+
+test('should keep a post-tow state free of undefined fields, JSON round-trippable, and on the current STATE_VERSION', () => {
+    // Same `State` invariants `movement.test.ts`'s `assertPureAndSerializable`
+    // pins for movement actions (state.ts's "no optional fields, JSON
+    // round-trips unchanged" contract): `RESCUE` builds `player`, `vessel`,
+    // and the rest of `next` via spreads over a real prior state, so a tow
+    // must never introduce a stray `undefined`, must survive a
+    // `JSON.parse(JSON.stringify(...))` round trip byte-for-byte, and must
+    // still carry the `STATE_VERSION` every `State` is tagged with.
+    const before = stateAt({ systemId: 'vega', fuel: 0, credits: 1000, cargo: { ore: 5 } });
+    assert.equal(isStranded(before), true);
+
+    const post = reduce(before, { type: 'RESCUE' });
+    assert.equal(post.lastRejection, null);
+
+    assert.deepStrictEqual(findUndefined(post), []);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(post)), post);
+    assert.equal(post.version, STATE_VERSION);
 });
