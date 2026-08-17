@@ -79,6 +79,91 @@ export function nearestDepot(state: State): string | null {
   return nearestId;
 }
 
+/**
+ * Tows a stranded player to the nearest depot, forfeiting all cargo and a
+ * percentage of credits. Hull damage persists. The run continues.
+ *
+ * No `requires`. `isStranded` (see `fuel.ts`) is deliberately posture-blind —
+ * "docked or adrift" per DESIGN.md §8, since `UNDOCK` is always free and
+ * legal, so posture is never a real barrier to the underlying fuel problem.
+ * A `requires: 'inSpace'` or `requires: 'docked'` here would silently exclude
+ * whichever posture it didn't name, contradicting the very selector this spec
+ * exists to answer for. `RESCUE` must be callable from either posture, so it
+ * enforces no posture at all and leaves stranding itself as the only gate.
+ *
+ * `apply` checks precondition before destination: `NOT_STRANDED` first,
+ * `NO_DEPOT` second. A player who is not stranded has no rescue to grant in
+ * the first place, so the question "where would the tow go" never needs
+ * asking — the same cheapest-check-first ordering `refuelSpec` uses for
+ * `NO_DEPOT` before `FUEL_CAPACITY_EXCEEDED` before `INSUFFICIENT_CREDITS` in
+ * `fuel.ts`.
+ *
+ * `vessel.cargo` is reset with a fresh `{}` literal on every `apply` call,
+ * never a shared module-level constant — the same aliasing rule
+ * `initialState` documents in `state.ts`: two rescues (or a rescue and a
+ * fresh run) must never end up with `Vessel.cargo` objects that are the same
+ * reference, or a mutation via one player's state would silently leak into
+ * the other's.
+ *
+ * Hull is carried through untouched: `{ ...state.vessel, cargo: {}, fuel }`
+ * spreads `state.vessel` first, so `hull` passes through by construction
+ * with no line here ever naming it. This is AC #4, and it is the mechanism
+ * behind DESIGN.md §8's "the real cost of a bad run is a forced journey home,
+ * not a number on a ledger" — a tow fixes the player's fuel and position, not
+ * the damage that got them stranded, so hull repair remains a separate,
+ * deliberate spend at a core system.
+ *
+ * The fuel grant (AC #3, "enough fuel for at least one jump") is derived from
+ * `SYSTEMS`/`fuelCostOf` at call time rather than hard-coded as a constant,
+ * so it can never drift out of step with the map: if M2 changes distances or
+ * adds systems, `minJumpCost` recomputes against the new geometry
+ * automatically instead of leaving a stale number here for someone to
+ * remember to update. `Math.max(state.vessel.fuel, minJumpCost)` is a floor,
+ * not an assignment — a tow tops the tank up to "enough to leave again" but
+ * never drains fuel the player already had more of, since a rescue is a
+ * bailout, not an additional penalty on top of the credit and cargo cost.
+ * `Math.min(state.vessel.fuelCapacity, ...)` then caps that floor at the
+ * tank's own ceiling, the same "never exceed capacity" stance `refuelSpec`
+ * enforces for a purchased top-up.
+ *
+ * The credit deduction rounds with `Math.ceil`, not `Math.round` or
+ * `Math.floor`: rounding the *deduction* up is what keeps the fee from ever
+ * favoring the player at fractional-credit boundaries, mirroring
+ * `fuelCostOf`'s "round the cost up, never down" stance in `fuel.ts`.
+ * `Math.max(0, ...)` around the whole subtraction is AC #2's floor, spelled
+ * out explicitly rather than left implicit: without it, a player with fewer
+ * credits than `RESCUE_CREDIT_SHARE` would cost would end up with a negative
+ * balance, which nothing else in `State` guards against.
+ *
+ * The tow ends **docked** (`player: { systemId: destination, docked: true }`)
+ * rather than adrift in the depot system: arriving docked lets the player
+ * `REFUEL` or trade immediately on the very next action, with no forced
+ * `DOCK` tick standing between "just got rescued" and "can recover." Every
+ * legal jump lands undocked (`jumpSpec` in `movement.ts`); a rescue is
+ * deliberately not a jump.
+ *
+ * `duration` reuses `JUMP_TICKS_PER_DISTANCE`, the same tick-per-distance rate
+ * an ordinary `JUMP` uses — a tow does not currently move any slower than the
+ * player could move under their own power. A distinct, slower tow-speed
+ * multiplier (a tow is a favor, not a service the player paid full jump speed
+ * for) is a deliberate scope cut left as an explicit M0-12 tuning lever, not
+ * an oversight: introducing one now, with no playtesting data to justify a
+ * specific value, would be exactly the kind of premature constant this
+ * codebase's other placeholders (`RESCUE_CREDIT_SHARE`, `FUEL_PER_DISTANCE`,
+ * etc.) avoid.
+ *
+ * `Math.min(state.vessel.fuelCapacity, ...)` also covers a case that cannot
+ * yet be reached: if the cheapest jump out of `destination` ever exceeded
+ * `fuelCapacity` (an unreachable-in-slice-0 map shape, since the current
+ * two-system map's only depot-to-depot-adjacent leg comfortably fits under
+ * `INITIAL_FUEL_CAPACITY`), the grant would clamp at the tank's ceiling
+ * rather than overfill it, leaving the player stranded again immediately
+ * after being rescued. That outcome is accepted as a clamp, not defended
+ * against with a new rejection reason: `RESCUE` has no destination-quality
+ * precondition to fail on, only `NOT_STRANDED` and `NO_DEPOT`, and a tow that
+ * cannot fully resolve stranding on a pathological future map is still
+ * correctly the *nearest* depot — the map, not this spec, would be at fault.
+ */
 export const rescueSpec = defineAction<RescueAction>({
   parse: () => ({ type: 'RESCUE' }),
   duration: (state) =>
@@ -92,6 +177,8 @@ export const rescueSpec = defineAction<RescueAction>({
       return reject('NO_DEPOT');
     }
 
+    // Fuel is granted relative to the destination, so `fuelCostOf` must see
+    // the player as already relocated there before it computes routes out.
     const relocated = { ...state, player: { systemId: destination, docked: true } };
     const minJumpCost = SYSTEMS.filter((s) => s.id !== destination).reduce<number | null>((min, s) => {
       const cost = fuelCostOf(relocated, s.id);
@@ -100,6 +187,9 @@ export const rescueSpec = defineAction<RescueAction>({
       }
       return min === null ? cost : Math.min(min, cost);
     }, null);
+    // No reachable system at all (only possible on a future, richer map) —
+    // leave fuel untouched rather than inventing a grant with nothing to size
+    // it against.
     const fuel =
       minJumpCost === null
         ? state.vessel.fuel
