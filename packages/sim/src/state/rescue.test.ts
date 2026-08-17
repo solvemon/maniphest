@@ -7,6 +7,7 @@ import { fuelCostOf, isStranded } from './fuel.ts';
 import { distanceBetween, hasDepot, SYSTEMS } from '../map/index.ts';
 import { JUMP_TICKS_PER_DISTANCE } from './movement.ts';
 import { nearestDepot, RESCUE_CREDIT_SHARE } from './rescue.ts';
+import type { RejectionReason } from './rejection.ts';
 
 /**
  * Shared fixtures and helpers for `rescue.test.ts`. Kept at the top of the
@@ -68,6 +69,31 @@ function stateAt({ systemId, docked, fuel, credits, cargo, hull }: StateAtOption
         },
         credits: credits ?? state.credits,
     };
+}
+
+/**
+ * Asserts that `reduce(prev, action)` takes the rejection path with
+ * `expected` as the reason, and that the result satisfies every invariant a
+ * rejection must: the tick does not advance, the offending `action` is
+ * recorded verbatim, and nothing else in `state` changes - proved by
+ * comparing `next` and `prev` serialized whole, with only `lastRejection`
+ * excluded.
+ *
+ * Same shape as `fuel.test.ts`'s and `movement.test.ts`'s `assertRejected`;
+ * kept local here since no shared rejection-assert helper lives in
+ * `./test-helpers.ts`.
+ */
+function assertRejected(prev: State, action: unknown, expected: RejectionReason): void {
+    const next = reduce(prev, action);
+
+    assert.notEqual(next, prev);
+    assert.equal(next.tick, prev.tick);
+    assert.equal(next.lastRejection?.reason, expected);
+    assert.deepStrictEqual(next.lastRejection?.action, action);
+    assert.equal(
+        JSON.stringify({ ...next, lastRejection: null }),
+        JSON.stringify({ ...prev, lastRejection: null }),
+    );
 }
 
 test('should build test states that differ from initialState only in the intended fields', () => {
@@ -287,4 +313,36 @@ test('should draw no randomness on a tow', () => {
 
     assert.equal(after.lastRejection, null);
     assert.deepStrictEqual(after.rng, before.rng);
+});
+
+test('should reject RESCUE with NOT_STRANDED when docked at a depot with full fuel', () => {
+    // `isStranded` short-circuits to `false` for any player standing at a
+    // depot, regardless of fuel - `rescueSpec.apply` checks that precondition
+    // first, so a `RESCUE` dispatched from `sol` (the slice-0 map's only
+    // depot) with a full tank has nothing to rescue and is refused outright,
+    // with the rest of `state` passing through byte-for-byte unchanged.
+    const before = stateAt({
+        systemId: 'sol',
+        docked: true,
+        fuel: initialState(SEED).vessel.fuelCapacity,
+    });
+    assert.equal(isStranded(before), false);
+
+    assertRejected(before, { type: 'RESCUE' }, 'NOT_STRANDED');
+});
+
+test('should reject RESCUE with NOT_STRANDED for the broke-at-a-depot boundary', () => {
+    // AC-adjacent boundary pinned by rejection.ts's doc comment on
+    // `NOT_STRANDED`: a player docked at a depot with `credits: 0` and
+    // `fuel: 0` cannot afford to refuel and cannot jump anywhere, yet
+    // `isStranded` deliberately reads this as "not stranded" - broke-at-a-
+    // depot is a solvent-but-poor problem the player can dig out of on their
+    // own (sell cargo, wait, earn credits), not a stuck-with-no-route one.
+    // `RESCUE` must refuse to tow a player who is already standing on the
+    // fuel they cannot afford, rather than wasting a rescue relocating them
+    // nowhere useful.
+    const before = stateAt({ systemId: 'sol', docked: true, fuel: 0, credits: 0 });
+    assert.equal(isStranded(before), false);
+
+    assertRejected(before, { type: 'RESCUE' }, 'NOT_STRANDED');
 });
