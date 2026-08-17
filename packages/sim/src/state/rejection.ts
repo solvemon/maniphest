@@ -41,6 +41,23 @@
  *   `units * FUEL_PRICE_PER_UNIT`. Pulled forward from M0-07's roadmap
  *   because `REFUEL` needs a credits check now, not just trading.
  *
+ * M0-06 adds one more, for the rescue tow:
+ *
+ * - `NOT_STRANDED` rejects a `RESCUE` where `isStranded(state)` is `false`.
+ *   This includes the broke-at-a-depot soft-lock M0-05 deliberately excludes
+ *   from `isStranded`: standing at a depot with no credits for fuel is a
+ *   solvent-but-poor problem the player can dig out of on their own, not a
+ *   stuck-with-no-route one, so it reads as "not stranded" here too and a
+ *   tow is refused rather than wasted relocating a player who is already
+ *   where the fuel is. `RESCUE` reuses `NO_DEPOT` rather than adding a
+ *   near-duplicate code for "no routed depot to tow to" - the two rejections
+ *   describe the same underlying fact, lack of a depot the ship can reach,
+ *   so one reason code covers both callers. This branch is not yet reachable
+ *   through `reduce` in the current two-system map, since every stranding
+ *   case that map can produce also has a route to a depot - but it is
+ *   directly unit-testable today via `nearestDepot`, the same stance
+ *   `NO_ROUTE` already documents above.
+ *
  * M0-07 still extends it further with `INSUFFICIENT_CARGO_SPACE` and
  * `INSUFFICIENT_STOCK`.
  */
@@ -55,7 +72,8 @@ export type RejectionReason =
   | 'INSUFFICIENT_CREDITS'
   | 'INSUFFICIENT_FUEL'
   | 'NO_DEPOT'
-  | 'NO_ROUTE';
+  | 'NO_ROUTE'
+  | 'NOT_STRANDED';
 
 /**
  * The result of an action that was not applied.

@@ -3,6 +3,7 @@ import { defineAction } from './actions.ts';
 import { refuelSpec } from './fuel.ts';
 import { dockSpec, jumpSpec, undockSpec } from './movement.ts';
 import { reject } from './rejection.ts';
+import { rescueSpec } from './rescue.ts';
 
 /**
  * The driver's lookup table from an action's `type` string to the
@@ -33,6 +34,7 @@ export const ACTIONS: Record<string, ActionSpec> = Object.assign(Object.create(n
   DOCK: dockSpec,
   UNDOCK: undockSpec,
   REFUEL: refuelSpec,
+  RESCUE: rescueSpec,
   // Single append point for new action types: M0-07 adds BUY/SELL. Add each
   // as a new entry here rather than editing the driver in reduce.ts.
 });
