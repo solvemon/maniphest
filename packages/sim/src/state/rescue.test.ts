@@ -4,6 +4,7 @@ import { initialState } from './state.ts';
 import type { State } from './state.ts';
 import { reduce } from './reduce.ts';
 import { isStranded } from './fuel.ts';
+import { RESCUE_CREDIT_SHARE } from './rescue.ts';
 
 /**
  * Shared fixtures and helpers for `rescue.test.ts`. Kept at the top of the
@@ -101,4 +102,21 @@ test('should accept a RESCUE after stranding is reached through legal play', () 
     // stranded, and `sol` (the only depot on the slice-0 map) is reachable
     // as a rescue destination.
     assert.equal(s.lastRejection, null);
+});
+
+test('should empty cargo and take its credit share on a tow', () => {
+    // AC #1: a stranded player carrying cargo is towed for a credit fee - the
+    // tow forfeits every unit of cargo (down to a fresh `{}`, per rescue.ts's
+    // doc comment on aliasing) and takes `RESCUE_CREDIT_SHARE` of credits,
+    // rounded up via `Math.ceil` the same way `rescueSpec.apply` computes it,
+    // so this test can never drift out of step with a future tuning of the
+    // constant's value.
+    const before = stateAt({ systemId: 'vega', fuel: 0, credits: 1000, cargo: { ore: 5, water: 2 } });
+    assert.equal(isStranded(before), true);
+
+    const after = reduce(before, { type: 'RESCUE' });
+
+    assert.equal(after.lastRejection, null);
+    assert.deepStrictEqual(after.vessel.cargo, {});
+    assert.equal(after.credits, before.credits - Math.ceil(before.credits * RESCUE_CREDIT_SHARE));
 });
