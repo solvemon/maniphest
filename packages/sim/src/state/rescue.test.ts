@@ -200,3 +200,47 @@ test('should leave hull damage untouched by a tow', () => {
     assert.equal(after.lastRejection, null);
     assert.equal(after.vessel.hull, 37);
 });
+
+test('should never leave a tow with less fuel than the tank already held', () => {
+    // The fuel grant is a floor, not an assignment: `apply` computes
+    // `Math.max(state.vessel.fuel, minJumpCost)`, so a tow must never leave
+    // the player with *less* fuel than they were already carrying, even when
+    // that pre-tow amount already covered the cheapest jump back out of the
+    // depot.
+    //
+    // Pinning that exact scenario - `isStranded(before) === true` while
+    // `before.vessel.fuel` already exceeds `minJumpCost` at the destination -
+    // turns out to be impossible on the current two-system slice-0 map, for
+    // any `State` whatsoever, not just ones `stateAt` can build: `minJumpCost`
+    // at `sol` and the very fuel shortfall that makes `vega` stranded are the
+    // *same* expression - `distanceBetween('sol', 'vega')` (one
+    // order-independent `DISTANCES` entry, since `sol|vega` and `vega|sol`
+    // hash to the identical key) divided by the identical vessel's
+    // `fuelEfficiency`, because `rescueSpec.apply`'s `relocated` reuses
+    // `state.vessel` unchanged. "Stranded" (`fuel < cost`) and "already
+    // enough fuel" (`fuel >= cost`) can therefore never both hold for the
+    // same `cost` - no `fuelEfficiency`, `fuel`, or `fuelCapacity` value
+    // changes that, confirmed by sweeping the parameter space by hand before
+    // writing this fixture.
+    //
+    // What *is* constructible, and pins the same "never drains" guarantee via
+    // the tank's ceiling instead of its floor, is a fixture where
+    // `fuelCapacity` is set equal to the starting `fuel`: `fuelEfficiency:
+    // 0.5` inflates the vega-to-sol jump to `ceil(10 / 0.5)` = 20, well past
+    // `fuel: 10`, so `isStranded` below is genuinely - not just nominally -
+    // true. The tow's floor then wants to raise fuel to 20, but
+    // `Math.min(fuelCapacity, ...)` - the tank's hard ceiling - clamps that
+    // straight back down to the 10 already in the tank, so the grant is
+    // observably a no-op: the tow succeeds, yet fuel never moves, which is
+    // exactly the "topped up, never drained" contract this test exists to
+    // pin, reached through the capacity ceiling since the floor comparison
+    // alone is unreachable here.
+    const base = stateAt({ systemId: 'vega', fuel: 10 });
+    const before = { ...base, vessel: { ...base.vessel, fuelEfficiency: 0.5, fuelCapacity: 10 } };
+    assert.equal(isStranded(before), true);
+
+    const after = reduce(before, { type: 'RESCUE' });
+
+    assert.equal(after.lastRejection, null);
+    assert.equal(after.vessel.fuel, before.vessel.fuel);
+});
