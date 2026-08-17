@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { initialState } from './state.ts';
 import type { State } from './state.ts';
 import { reduce } from './reduce.ts';
-import { isStranded } from './fuel.ts';
+import { fuelCostOf, isStranded } from './fuel.ts';
+import { hasDepot, SYSTEMS } from '../map/index.ts';
 import { RESCUE_CREDIT_SHARE } from './rescue.ts';
 
 /**
@@ -136,4 +137,30 @@ test('should give the post-tow cargo a fresh object identity, never aliased', ()
     const otherBefore = stateAt({ systemId: 'vega', fuel: 0, cargo: { water: 3 } });
     const otherAfter = reduce(otherBefore, { type: 'RESCUE' });
     assert.notStrictEqual(after.vessel.cargo, otherAfter.vessel.cargo);
+});
+
+test('should tow a stranded player to a depot with enough fuel for a jump, docked', () => {
+    // AC #3: the tow must not just move the player - it must resolve the
+    // stranding outright, landing them docked at an actual depot with enough
+    // fuel in the tank to make at least one more jump.
+    const before = stateAt({ systemId: 'vega', fuel: 0 });
+    assert.equal(isStranded(before), true);
+
+    const after = reduce(before, { type: 'RESCUE' });
+    assert.equal(after.lastRejection, null);
+
+    assert.equal(hasDepot(after.player.systemId), true);
+    assert.equal(
+        SYSTEMS.some((s) => {
+            if (s.id === after.player.systemId) {
+                return false;
+            }
+            const cost = fuelCostOf(after, s.id);
+            return cost !== null && cost <= after.vessel.fuel;
+        }),
+        true,
+    );
+    assert.equal(isStranded(after), false);
+    assert.ok(after.vessel.fuel <= after.vessel.fuelCapacity);
+    assert.equal(after.player.docked, true);
 });
