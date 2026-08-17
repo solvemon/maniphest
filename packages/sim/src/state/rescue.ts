@@ -30,3 +30,26 @@ import type { State } from './state.ts';
  * wealth grows.
  */
 export const RESCUE_CREDIT_SHARE = 0.25;
+
+export function nearestDepot(state: State): string | null {
+  let nearestId: string | null = null;
+  let nearestDistance = Infinity;
+
+  for (const system of SYSTEMS) {
+    if (!hasDepot(system.id)) {
+      continue;
+    }
+
+    const distance = distanceBetween(state.player.systemId, system.id);
+    if (distance === null) {
+      continue;
+    }
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestId = system.id;
+    }
+  }
+
+  return nearestId;
+}
