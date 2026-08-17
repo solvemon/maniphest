@@ -79,11 +79,21 @@ export function nearestDepot(state: State): string | null {
   return nearestId;
 }
 
-// TODO(M0-06 task 11/12): `apply` is a placeholder until those tasks land —
-// it is currently a no-op.
 export const rescueSpec = defineAction<RescueAction>({
   parse: () => ({ type: 'RESCUE' }),
   duration: (state) =>
     (distanceBetween(state.player.systemId, nearestDepot(state) ?? '') ?? 0) * JUMP_TICKS_PER_DISTANCE,
-  apply: (state) => state,
+  apply: (state) => {
+    if (!isStranded(state)) {
+      return reject('NOT_STRANDED');
+    }
+    const destination = nearestDepot(state);
+    if (destination === null) {
+      return reject('NO_DEPOT');
+    }
+    // TODO(M0-06 task 12): tow the player to `destination`, charging
+    // `RESCUE_CREDIT_SHARE` of their credits. Returning `state` unchanged is
+    // a placeholder until that task lands.
+    return state;
+  },
 });
